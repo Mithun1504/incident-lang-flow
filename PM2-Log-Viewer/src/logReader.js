@@ -100,7 +100,7 @@ class PM2LogReader extends EventEmitter {
     }
 
     // Setup file watcher if possible
-    this.setupWatcher();
+    if (!this.watcher) this.setupWatcher();
   }
 
   setupWatcher() {

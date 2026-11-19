@@ -2,7 +2,7 @@
 
 A local incident-automation prototype containing three independent applications:
 
-- `LangFlow/` — LangFlow flows and custom components. It receives normalized incidents, creates/deduplicates Jira tickets, and can create a GitHub PR from `fix/<JIRA-KEY>` after a ticket is marked Done.
+- `LangFlow/` — LangFlow flows and custom components. It receives normalized incidents, creates/deduplicates Jira tickets, and can create a GitHub PR from `fix/<JIRA-KEY>` after a ticket reaches its configured resolved status.
 - `incident-demo-app/` — the four-button Express demo application used to produce successful and intentional error events.
 - `PM2-Log-Viewer/` — a small log-viewer/forwarder application that reads the demo PM2 error log and forwards normalized incidents to LangFlow.
 
