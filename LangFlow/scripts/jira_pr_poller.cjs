@@ -8,14 +8,12 @@ const baseUrl = (process.env.JIRA_BASE_URL || "").replace(/\/+$/, "");
 const jiraEmail = process.env.JIRA_EMAIL || "";
 const jiraToken = process.env.JIRA_API_TOKEN || "";
 const projectKey = process.env.JIRA_PROJECT_KEY || "DEMO";
+const triggerStatus = process.env.JIRA_PR_TRIGGER_STATUS || "Done";
 const langflowUrl = `${(process.env.LANGFLOW_BASE_URL || "http://localhost:7860").replace(/\/+$/, "")}/api/v1/webhook/jira_done_to_pr`;
 const langflowApiKey = process.env.LANGFLOW_API_KEY || "";
 const intervalMs = Math.max(5000, Number(process.env.JIRA_PR_POLL_INTERVAL_MS || 15000));
 const stateFile = path.resolve(__dirname, "..", process.env.JIRA_PR_POLLER_STATE_FILE || "runtime/jira-pr-poller-state.json");
 
-if (!baseUrl || !jiraEmail || !jiraToken || !langflowApiKey) {
-  throw new Error("Jira credentials, LangFlow API key, and LangFlow base URL are required");
-}
 
 const jiraAuth = `Basic ${Buffer.from(`${jiraEmail}:${jiraToken}`).toString("base64")}`;
 let state = {};
@@ -38,6 +36,7 @@ function saveState() {
 async function jiraRequest(endpoint, options = {}) {
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
+    signal: AbortSignal.timeout(20000),
     headers: {
       Authorization: jiraAuth,
       Accept: "application/json",
@@ -60,15 +59,31 @@ function flattenAdf(value) {
   return String(value);
 }
 
-async function findDoneIssues() {
-  const jql = `project = ${projectKey} AND status = \"Done\" ORDER BY updated ASC`;
-  const body = await jiraRequest(`/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status,comment,updated`);
-  return body.issues || [];
+function issueQuery(issueKey = "") {
+  if (issueKey && !new RegExp(`^${projectKey}-[0-9]+$`).test(issueKey)) {
+    throw new Error("Test issue must belong to the configured Jira project");
+  }
+  const scope = issueKey ? `key = ${JSON.stringify(issueKey)}` : `project = ${JSON.stringify(projectKey)}`;
+  return `${scope} AND status = ${JSON.stringify(triggerStatus)} AND labels = "automated-incident" ORDER BY updated ASC`;
+}
+
+async function findDoneIssues(issueKey = "") {
+  const issues = [];
+  let nextPageToken;
+  do {
+    const query = new URLSearchParams({ jql: issueQuery(issueKey), maxResults: "50", fields: "summary,status,comment,updated" });
+    if (nextPageToken) query.set("nextPageToken", nextPageToken);
+    const body = await jiraRequest(`/rest/api/3/search/jql?${query}`);
+    issues.push(...(body.issues || []));
+    nextPageToken = body.isLast === true ? null : body.nextPageToken;
+  } while (nextPageToken);
+  return issues;
 }
 
 async function runFlow(issue) {
   const response = await fetch(langflowUrl, {
     method: "POST",
+    signal: AbortSignal.timeout(20000),
     headers: { "Content-Type": "application/json", "x-api-key": langflowApiKey },
     body: JSON.stringify({ issue }),
   });
@@ -84,8 +99,8 @@ async function waitForPrComment(issueKey) {
   return /GitHub PR .*https:\/\/github\.com\//i.test(text);
 }
 
-async function pollOnce() {
-  const issues = await findDoneIssues();
+async function pollOnce(issueKey = "") {
+  const issues = await findDoneIssues(issueKey);
   for (const issue of issues) {
     const key = issue.key;
     const existingText = flattenAdf(issue.fields?.comment);
@@ -96,7 +111,7 @@ async function pollOnce() {
     if (state[key]?.status === "completed" && state[key]?.updated === issue.fields?.updated) continue;
 
     try {
-      console.log(`[Jira PR Poller] Processing ${key} (Done)`);
+      console.log(`[Jira PR Poller] Processing ${key} (${triggerStatus})`);
       await runFlow(issue);
       const complete = await waitForPrComment(key);
       state[key] = {
@@ -116,13 +131,22 @@ async function pollOnce() {
 }
 
 async function main() {
+  if (!baseUrl || !jiraEmail || !jiraToken || !langflowApiKey) {
+    throw new Error("Jira credentials and LangFlow API key are required");
+  }
   loadState();
-  console.log(`[Jira PR Poller] Watching ${projectKey} Done issues every ${intervalMs}ms`);
-  await pollOnce();
-  setInterval(() => pollOnce().catch((error) => console.warn(`[Jira PR Poller] Poll failed: ${error.message}`)), intervalMs);
+  const issueKey = (process.argv.find((arg) => arg.startsWith("--issue=")) || "").slice(8);
+  console.log(`[Jira PR Poller] Watching ${projectKey} ${triggerStatus} issues every ${intervalMs}ms`);
+  async function tick() {
+    try { await pollOnce(issueKey); }
+    catch (error) { console.warn(`[Jira PR Poller] Poll failed: ${error.message}`); }
+    // Schedule only after the previous poll finishes, preventing overlap.
+    if (!process.argv.includes("--once")) setTimeout(tick, intervalMs);
+  }
+  await tick();
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+module.exports = { issueQuery, findDoneIssues, pollOnce };
+if (require.main === module) {
+  main().catch((error) => { console.error(error.message); process.exitCode = 1; });
+}

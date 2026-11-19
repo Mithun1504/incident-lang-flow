@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from langflow.custom import Component
-from langflow.io import HandleInput, Output
+from langflow.io import HandleInput, Output, StrInput
 from langflow.schema import Data
 
 
@@ -13,7 +13,10 @@ class ValidateJiraDone(Component):
     icon = "circle-check"
     name = "ValidateJiraDone"
 
-    inputs = [HandleInput(name="event", display_name="Parsed Jira Event", input_types=["Data", "JSON", "Message"], required=False)]
+    inputs = [
+        HandleInput(name="event", display_name="Parsed Jira Event", input_types=["Data", "JSON", "Message"], required=False),
+        StrInput(name="trigger_status", display_name="PR Trigger Status", value="Done"),
+    ]
     outputs = [Output(display_name="Validated Event", name="result", method="process")]
 
     @staticmethod
@@ -31,7 +34,8 @@ class ValidateJiraDone(Component):
 
     def process(self) -> Data:
         event = self._dict(self.event)
-        expected = os.environ.get("JIRA_PR_TRIGGER_STATUS", "Done").strip() or "Done"
+        expected = str(self.trigger_status or os.environ.get("JIRA_PR_TRIGGER_STATUS", "Done")).strip()
+        event["trigger_status"] = expected
         event["eligible"] = bool(event.get("issue_key")) and str(event.get("status_name", "")).casefold() == expected.casefold()
         event["validation"] = "passed" if event["eligible"] else "ignored"
         return Data(data=event)

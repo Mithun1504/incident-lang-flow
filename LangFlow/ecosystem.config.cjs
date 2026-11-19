@@ -23,6 +23,17 @@ module.exports = {
         SERVICE_NAME: process.env.SERVICE_NAME || 'button-demo',
         ENVIRONMENT: process.env.ENVIRONMENT || 'local'
       }
+    },
+    {
+      name: 'jira-pr-poller',
+      script: './scripts/jira_pr_poller.cjs',
+      cwd: __dirname,
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      error_file: path.resolve(__dirname, 'runtime/pm2/jira-pr-poller-error.log'),
+      out_file: path.resolve(__dirname, 'runtime/pm2/jira-pr-poller-out.log'),
+      time: true
     }
   ]
 };

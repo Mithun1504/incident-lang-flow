@@ -3,7 +3,7 @@ import os
 from typing import Any
 
 from langflow.custom import Component
-from langflow.io import HandleInput, Output
+from langflow.io import HandleInput, Output, StrInput
 from langflow.schema import Data
 
 
@@ -13,7 +13,10 @@ class PreparePRContext(Component):
     icon = "git-pull-request"
     name = "PreparePRContext"
 
-    inputs = [HandleInput(name="event", display_name="Validated Jira Event", input_types=["Data", "JSON", "Message"], required=False)]
+    inputs = [
+        HandleInput(name="event", display_name="Validated Jira Event", input_types=["Data", "JSON", "Message"], required=False),
+        StrInput(name="branch_prefix", display_name="Fix Branch Prefix", value="fix/"),
+    ]
     outputs = [Output(display_name="PR Context", name="result", method="process")]
 
     @staticmethod
@@ -36,6 +39,6 @@ class PreparePRContext(Component):
             "owner": os.environ.get("GITHUB_OWNER", "anuraag-bagepalli").strip(),
             "repository": os.environ.get("GITHUB_REPOSITORY", "incident-demo-app").strip(),
             "base_branch": os.environ.get("GITHUB_BASE_BRANCH", "main").strip() or "main",
-            "branch": f"fix/{key}" if key else "",
+            "branch": f"{self.branch_prefix or 'fix/'}{key}" if key else "",
         })
         return Data(data=event)

@@ -7,7 +7,7 @@ import urllib.request
 from typing import Any, Optional
 
 from langflow.custom import Component
-from langflow.io import HandleInput, Output
+from langflow.io import HandleInput, Output, StrInput
 from langflow.schema import Data
 
 
@@ -17,7 +17,10 @@ class CreateGitHubPR(Component):
     icon = "github"
     name = "CreateGitHubPR"
 
-    inputs = [HandleInput(name="context", display_name="PR Context", input_types=["Data", "JSON", "Message"], required=False)]
+    inputs = [
+        HandleInput(name="context", display_name="PR Context", input_types=["Data", "JSON", "Message"], required=False),
+        StrInput(name="raised_status", display_name="Optional Status After PR", value=""),
+    ]
     outputs = [Output(display_name="PR Result", name="result", method="process")]
 
     @staticmethod
@@ -50,7 +53,9 @@ class CreateGitHubPR(Component):
                 return json.loads(text) if text else {}
         except urllib.error.HTTPError as error:
             detail = error.read().decode(errors="replace") if error.fp else ""
-            raise RuntimeError(f"GitHub API error ({error.code}): {detail[:500]}") from error
+            failure = RuntimeError(f"GitHub API error ({error.code}): {detail[:500]}")
+            failure.status_code = error.code
+            raise failure from error
 
     def _jira(self, endpoint: str, method: str = "GET", body: Optional[dict] = None) -> Any:
         base = os.environ.get("JIRA_BASE_URL", "").rstrip("/")
@@ -72,6 +77,13 @@ class CreateGitHubPR(Component):
         if not context.get("eligible"):
             return Data(data={**context, "status": "ignored", "reason": context.get("validation", "status_not_done")})
         key = str(context.get("issue_key") or "")
+        if not key.startswith(os.environ.get("JIRA_PROJECT_KEY", "DEMO").strip() + "-"):
+            raise ValueError("Jira issue does not belong to the configured project")
+        issue_path = f"/rest/api/3/issue/{urllib.parse.quote(key, safe='')}"
+        live_issue = self._jira(f"{issue_path}?fields=status,comment")
+        current_status = str(((live_issue.get("fields") or {}).get("status") or {}).get("name") or "")
+        if current_status.casefold() != str(context.get("trigger_status") or "Done").casefold():
+            return Data(data={**context, "status": "ignored", "reason": "jira_status_changed", "jira_status": current_status})
         owner = str(context.get("owner") or "")
         repo = str(context.get("repository") or "")
         branch = str(context.get("branch") or f"fix/{key}")
@@ -81,9 +93,12 @@ class CreateGitHubPR(Component):
         try:
             self._github(f"/repos/{repo_path}/branches/{encoded_branch}")
         except Exception as error:
-            message = f"Branch {branch} is not available in {owner}/{repo}. Push it before marking {key} Done."
+            if getattr(error, "status_code", None) != 404:
+                raise
+            message = f"Branch {branch} is not available in {owner}/{repo}. Push it before resolving {key}."
             try:
-                self._jira(f"/rest/api/3/issue/{urllib.parse.quote(key)}/comment", "POST", {"body": {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": message}]}]}})
+                if message not in json.dumps(live_issue.get("fields", {}).get("comment", {})):
+                    self._jira(f"{issue_path}/comment", "POST", {"body": {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": message}]}]}})
             except Exception:
                 pass
             return Data(data={**context, "status": "blocked", "reason": "missing_branch", "error": str(error)})
@@ -95,13 +110,15 @@ class CreateGitHubPR(Component):
         else:
             created = self._github(f"/repos/{repo_path}/pulls", "POST", {"title": f"Fix {key}: {context.get('summary') or key}", "head": branch, "base": base_branch, "body": f"Fixes {key}\n\nCreated from the developer's pushed branch.", "draft": False})
             pr_url, action = str(created.get("html_url") or ""), "created_pr"
-        self._jira(f"/rest/api/3/issue/{urllib.parse.quote(key)}/comment", "POST", {"body": {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"GitHub PR ({action}): {pr_url}"}]}]}})
-        target = os.environ.get("JIRA_PR_RAISED_STATUS", "PR Raised").strip() or "PR Raised"
-        transitions = self._jira(f"/rest/api/3/issue/{urllib.parse.quote(key)}/transitions")
-        transitioned = ""
+        if pr_url not in json.dumps(live_issue.get("fields", {}).get("comment", {})):
+            self._jira(f"{issue_path}/comment", "POST", {"body": {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"GitHub PR ({action}): {pr_url}"}]}]}})
+        target = str(self.raised_status or "").strip()
+        result = {**context, "status": "success", "action": action, "pr_url": pr_url, "jira_status": current_status}
+        if not target or current_status.casefold() == target.casefold():
+            return Data(data=result)
+        transitions = self._jira(f"{issue_path}/transitions")
         for transition in transitions.get("transitions", []) if isinstance(transitions, dict) else []:
             if str((transition.get("to") or {}).get("name", "")).casefold() == target.casefold():
-                self._jira(f"/rest/api/3/issue/{urllib.parse.quote(key)}/transitions", "POST", {"transition": {"id": transition["id"]}})
-                transitioned = target
-                break
-        return Data(data={**context, "status": "success", "action": action, "pr_url": pr_url, "jira_status": transitioned or target})
+                self._jira(f"{issue_path}/transitions", "POST", {"transition": {"id": transition["id"]}})
+                return Data(data={**result, "jira_status": target})
+        return Data(data={**result, "status": "partial", "warning": f"PR exists, but Jira transition to {target} is unavailable"})

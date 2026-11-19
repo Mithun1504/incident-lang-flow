@@ -1,6 +1,6 @@
 # Incident Management Automation Prototype (Phase 1: Local)
 
-A robust, production-grade incident-management prototype integrating:
+A local teaching prototype integrating:
 `Four-Button Express App` &rarr; `PM2` &rarr; `PM2-Log-Viewer` &rarr; `LangFlow Webhook` &rarr; `Jira Cloud Bug Ticket`
 
 ---
@@ -156,13 +156,12 @@ The flow named `incident_to_jira` is exposed at:
 `http://localhost:7860/api/v1/webhook/incident_to_jira`
 
 ### Structure
-1. **Webhook Trigger**: Receives the normalized JSON event from PM2-Log-Viewer with `x-api-key` header authentication.
-2. **Jira Incident Handler (`jira_incident_component.py`)**:
-   - Computes deterministic SHA-256 fingerprint: `sha256(service|route|error_type|message)`.
-   - Derives deduplication label: `incident-<prefix>` (first 8 characters).
-   - Searches Jira Cloud with JQL: `labels = "incident-<prefix>"`.
-   - **First Occurrence**: Creates a Jira Bug issue with formatted ADF description (What Failed, Metadata, Stack Trace, Likely Cause inference) and labels: `automated-incident`, `prototype`, `incident-<prefix>`.
-   - **Duplicate Occurrence**: Adds a recurrence comment to the existing issue and updates the description evidence, incrementing the occurrence counter without creating uncontrolled duplicate tickets.
+1. **Webhook Trigger** receives the viewer event using `x-api-key`.
+2. **Normalize Incident** unwraps Data/Message/string transport payloads, including literal newlines in stack traces. Missing route, error type, or message fails the run rather than creating a placeholder ticket.
+3. **Fingerprint Incident** preserves the viewer fingerprint (16 hexadecimal characters) or computes SHA-256 when absent; the first eight characters form the Jira label.
+4. **Create or Update Jira Ticket** searches the configured project by label, creates the configured issue type, or records recurrence on the existing issue. Titles are readable, for example `button-demo (local): IntentionalPrototypeError on /api/fail-two`. Telemetry and fingerprint remain in the description.
+
+The current graphs use `flow_*.py`. The older all-in-one components and repair/create scripts are legacy and should not be used to deploy the multi-node graphs.
 
 ### Manual UI Flow Import (if required)
 If you need to re-import the flow manually:
@@ -263,28 +262,94 @@ curl -X POST http://localhost:7860/api/v1/webhook/incident_to_jira \
 
 ---
 
-## 10. Jira Done to GitHub PR flow
+## 10. Resolved Jira incident to GitHub PR
 
-The second flow is named `jira_done_to_pr` and listens at:
+The developer must implement and push the fix before resolving the ticket.
+This automation opens a PR; it does not generate code, merge it, or deploy it.
 
-```text
-POST /api/v1/webhook/jira_done_to_pr
+For the current Jira Service Management `SUP` incident workflow, the **Resolve**
+action moves the ticket to **Completed**. Configure:
+
+```ini
+JIRA_PR_TRIGGER_STATUS=Completed
+JIRA_PR_RAISED_STATUS=
+GITHUB_BRANCH_PREFIX=fix/
+GITHUB_BASE_BRANCH=main
 ```
 
-For this prototype it is restricted to the configured demo repository and
-base branch. When a Jira issue reaches `JIRA_PR_TRIGGER_STATUS` (`Done`), the
-developer's branch must already exist as:
+`JIRA_PR_RAISED_STATUS` is optional. Leave it empty when the project has no
+`PR Raised` transition. The ticket then stays Completed and receives a PR link.
+For another project, use its actual status name and issue type. `Done`,
+`Resolved`, and `Completed` are different status names.
 
-```text
-fix/<JIRA-KEY>
+For a new incident such as SUP-4, work in the standalone developer repository:
+
+```bash
+git switch main
+git pull --ff-only
+git switch -c fix/SUP-4
+# implement and verify the fix
+git add server.js
+git commit -m "Fix SUP-4"
+git push -u origin fix/SUP-4
 ```
 
-The flow checks the branch, reuses an existing open PR when present, creates a
-new PR when needed, comments the PR URL on Jira, and transitions the issue to
-`JIRA_PR_RAISED_STATUS`. A missing branch is reported on Jira without creating
-a PR.
+The prefix is configurable: setting `GITHUB_BRANCH_PREFIX=feature/` requires
+`feature/SUP-4`. An existing remote branch with commits different from main is
+required; creating an empty branch is not enough to open a PR.
 
-Jira Cloud cannot call a local `localhost` endpoint directly. During local
-testing, use a protected HTTPS tunnel and configure Jira to call the tunnel
-URL. Keep the GitHub token only in `.env`; never put it in the flow canvas,
-browser code, README, or repository history.
+After changing graph behavior or non-secret PR settings, deploy using:
+
+```bash
+npm run flows:rebuild
+```
+
+Trigger status, optional post-PR status, and branch prefix are copied into the
+graph from `.env`. Credentials and repository settings remain server-side in
+the LangFlow container; changing those requires Compose recreation.
+
+### Local status watcher (recommended for this demo)
+
+Run the poller under PM2 so resolving a ticket triggers the flow automatically:
+
+```bash
+npm run pr:start
+# stop the watcher when done:
+npm run pr:stop
+```
+
+`npm run pm2:start` starts both the embedded demo and this watcher. The watcher
+searches only `automated-incident` issues in the configured project/status,
+handles pagination, and does not overlap its polling cycles. Restart it after
+changing `.env`. Do not run multiple pollers or both a webhook and a poller.
+
+For one targeted verification, without leaving a watcher running:
+
+```bash
+node scripts/jira_pr_poller.cjs --once --issue=SUP-4
+```
+
+The `jira_done_to_pr` flow checks the live issue status, checks the configured
+branch, reuses an open PR or creates one into main, and comments its URL on Jira.
+Repeated successful invocations reuse the PR and avoid repeating the same PR
+comment. Missing branches are blocked; authentication errors remain errors.
+The poller confirms the Jira PR-link comment rather than treating webhook HTTP
+acceptance as completion.
+
+Alternatively configure Jira to POST to `/api/v1/webhook/jira_done_to_pr` through
+a protected HTTPS tunnel. A browser GET is not a webhook test.
+
+### Tests
+
+```bash
+npm test
+```
+
+The Python standard-library tests mock HTTP boundaries and cover transport
+parsing, invalid events, titles, configured statuses/prefixes, branch failures,
+live-status checks, PR reuse, and unavailable Jira transitions. They require no
+LangFlow Python installation or credentials.
+
+The embedded running demo and standalone developer repository are separate
+copies. Pushing a fix does not change the embedded demo until you explicitly
+deploy the updated application.

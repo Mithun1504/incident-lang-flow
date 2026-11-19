@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Any, Optional
@@ -12,7 +13,7 @@ from langflow.schema import Data
 
 class JiraTicketWriter(Component):
     display_name = "Create or Update Jira Ticket"
-    description = "Searches by incident label, then creates a Jira Bug or updates the existing ticket."
+    description = "Searches by incident label, then creates or updates the configured Jira issue type."
     icon = "jira"
     name = "JiraTicketWriter"
 
@@ -55,6 +56,12 @@ class JiraTicketWriter(Component):
         return {}
 
     @staticmethod
+    def _text(value: Any) -> str:
+        if isinstance(value, dict):
+            return str(value.get("text") or "") + " " + " ".join(JiraTicketWriter._text(item) for item in value.get("content", []))
+        return ""
+
+    @staticmethod
     def _description(incident: dict, count: int) -> dict:
         lines = [
             f"Service: {incident.get('service')}",
@@ -81,23 +88,30 @@ class JiraTicketWriter(Component):
 
     def process(self) -> Data:
         incident = self._dict(self.incident)
+        for field in ("route", "error_type", "message", "fingerprint"):
+            if not incident.get(field):
+                raise ValueError(f"Incident is missing {field}; refusing to create an empty ticket")
+        project = os.environ.get("JIRA_PROJECT_KEY", "DEMO").strip()
+        summary = f"{incident.get('service')} ({incident.get('environment')}): {incident.get('error_type')} on {incident.get('route')}"[:255]
         label = str(incident.get("dedup_label") or f"incident-{str(incident.get('fingerprint', ''))[:8]}")
         result = dict(incident)
         result["jira_label"] = label
-        search = self._call("/rest/api/3/search/jql", "POST", {"jql": f'labels = "{label}" ORDER BY created DESC', "maxResults": 1, "fields": ["comment", "summary"]})
+        search = self._call("/rest/api/3/search/jql", "POST", {"jql": f'project = "{project}" AND labels = "{label}" ORDER BY created DESC', "maxResults": 1, "fields": ["description", "summary"]})
         existing = (search.get("issues") or [None])[0]
         if existing:
             key = existing.get("key")
-            comments = (((existing.get("fields") or {}).get("comment") or {}).get("comments") or [])
-            count = len(comments) + 2
+            evidence = self._text((existing.get("fields") or {}).get("description"))
+            previous = re.search(r"Occurrence Count: (\d+)", evidence)
+            count = int(previous.group(1)) if previous else 1
+            if f"Request ID: {incident.get('request_id')} " in evidence:
+                return Data(data={**result, "status": "unchanged", "action": "already_processed", "issue_key": key, "occurrence_count": count})
+            count += 1
             comment = {"body": {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Duplicate incident occurrence #{count}; request {incident.get('request_id')}."}]}]}}
             self._call(f"/rest/api/3/issue/{key}/comment", "POST", comment)
-            self._call(f"/rest/api/3/issue/{key}", "PUT", {"fields": {"description": self._description(incident, count)}})
+            self._call(f"/rest/api/3/issue/{key}", "PUT", {"fields": {"summary": summary, "description": self._description(incident, count)}})
             result.update({"status": "updated", "action": "duplicate_updated", "issue_key": key, "occurrence_count": count})
         else:
-            project = os.environ.get("JIRA_PROJECT_KEY", "DEMO").strip()
             issue_type = os.environ.get("JIRA_ISSUE_TYPE", "Bug").strip()
-            summary = f"[Incident][{incident.get('service')}][{incident.get('environment')}] {incident.get('error_type')} in {incident.get('route')} ({str(incident.get('fingerprint'))[:8]})"
             created = self._call("/rest/api/3/issue", "POST", {"fields": {"project": {"key": project}, "issuetype": {"name": issue_type}, "summary": summary, "description": self._description(incident, 1), "labels": ["automated-incident", "prototype", label]}})
             result.update({"status": "created", "action": "ticket_created", "issue_key": created.get("key"), "occurrence_count": 1})
         return Data(data=result)

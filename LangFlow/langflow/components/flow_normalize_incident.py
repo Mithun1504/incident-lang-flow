@@ -18,32 +18,45 @@ class NormalizeIncident(Component):
 
     @staticmethod
     def _dict(value: Any) -> dict:
-        if hasattr(value, "data"):
-            value = getattr(value, "data", None)
-        if hasattr(value, "text") and not isinstance(value, dict):
-            value = getattr(value, "text", "")
-        if isinstance(value, dict):
-            for key in ("data", "payload", "incident"):
-                nested = value.get(key)
-                if isinstance(nested, dict):
-                    return nested
-            return value
-        if isinstance(value, str):
-            text = value.strip()
-            try:
-                parsed = json.loads(text)
-                return NormalizeIncident._dict(parsed)
-            except Exception:
+        # Webhook/Message adapters can wrap JSON strings and materialize the
+        # escaped newlines inside stack traces. Never discard Message.text
+        # just because its data attribute is empty.
+        for _ in range(12):
+            if not isinstance(value, (dict, str)):
+                data = getattr(value, "data", None)
+                value = data if data else getattr(value, "text", None) or getattr(value, "default_value", None)
+            if isinstance(value, str):
+                text = value.strip()
                 start, end = text.find("{"), text.rfind("}")
+                candidates = [text]
                 if start >= 0 and end > start:
+                    candidates.append(text[start:end + 1])
+                for candidate in candidates:
                     try:
-                        return NormalizeIncident._dict(json.loads(text[start:end + 1]))
-                    except Exception:
-                        pass
-        return {}
+                        value = json.loads(candidate, strict=False)
+                        break
+                    except (ValueError, TypeError):
+                        continue
+                else:
+                    raise ValueError("Webhook payload must contain a JSON object")
+                continue
+            if isinstance(value, dict):
+                for key in ("data", "payload", "incident"):
+                    nested = value.get(key)
+                    if isinstance(nested, (dict, str)) and nested:
+                        value = nested
+                        break
+                else:
+                    return value
+                continue
+            raise ValueError("Webhook payload must contain a JSON object")
+        raise ValueError("Webhook payload has too many transport wrappers")
 
     def process(self) -> Data:
         raw = self._dict(self.input_data)
+        missing = [key for key in ("route", "error_type", "message") if not isinstance(raw.get(key), str) or not raw[key].strip()]
+        if missing:
+            raise ValueError("Incident is missing required fields: " + ", ".join(missing))
         incident = {
             "source": raw.get("source") or raw.get("source_app") or "pm2-log-viewer",
             "service": raw.get("service") or "button-demo",

@@ -42,6 +42,17 @@ function inputField(name, displayName) {
 }
 
 function customNode(id, position, code, className, displayName, inputName, inputDisplay) {
+  // Non-secret behavior settings are captured in the graph so a rebuild
+  // applies .env changes without relying on an old container environment.
+  const settings = {
+    ValidateJiraDone: { trigger_status: process.env.JIRA_PR_TRIGGER_STATUS || "Done" },
+    PreparePRContext: { branch_prefix: process.env.GITHUB_BRANCH_PREFIX || "fix/" },
+    CreateGitHubPR: { raised_status: process.env.JIRA_PR_RAISED_STATUS || "" },
+  };
+  const fields = Object.fromEntries(Object.entries(settings[className] || {}).map(([name, value]) => [name, {
+    _input_type: "StrInput", name, display_name: name.replaceAll("_", " "),
+    type: "str", value, input_types: [], required: false, show: true, advanced: true,
+  }]));
   return {
     id,
     type: "genericNode",
@@ -55,7 +66,7 @@ function customNode(id, position, code, className, displayName, inputName, input
         icon: "workflow",
         name: className,
         base_classes: ["Component", "Data"],
-        template: { _type: "Component", code: { value: code, type: "code" }, [inputName]: inputField(inputName, inputDisplay) },
+        template: { _type: "Component", code: { value: code, type: "code" }, [inputName]: inputField(inputName, inputDisplay), ...fields },
         outputs: [{ name: "result", display_name: "Result", types: ["Data"], selected: "Data", method: "process", value: "__UNDEFINED__", cache: true }],
       },
     },

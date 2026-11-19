@@ -5,6 +5,7 @@
   "main": "app/server.js",
   "type": "commonjs",
   "scripts": {
+    "test": "python3 -B -m unittest discover -s test -p 'test_*.py'",
     "start": "node app/server.js",
     "pm2:start": "node pm2.js start ecosystem.config.cjs",
     "pm2:stop": "node pm2.js stop button-demo",
@@ -12,6 +13,8 @@
     "pm2:logs": "node pm2.js logs button-demo",
     "collector": "node collector/collector.js",
     "pr:poll": "node scripts/jira_pr_poller.cjs",
+    "pr:start": "node pm2.js start ecosystem.config.cjs --only jira-pr-poller",
+    "pr:stop": "node pm2.js stop jira-pr-poller",
     "flows:rebuild": "node scripts/rebuild_visual_flows.cjs"
   },
   "dependencies": {
