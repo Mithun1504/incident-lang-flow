@@ -1,7 +1,7 @@
 # Incident Management Automation Prototype (Phase 1: Local)
 
 A robust, production-grade incident-management prototype integrating:
-`Four-Button Express App` &rarr; `PM2` &rarr; `Local Log Collector` &rarr; `LangFlow Webhook` &rarr; `Jira Cloud Bug Ticket`
+`Four-Button Express App` &rarr; `PM2` &rarr; `PM2-Log-Viewer` &rarr; `LangFlow Webhook` &rarr; `Jira Cloud Bug Ticket`
 
 ---
 
@@ -21,8 +21,8 @@ LangFlow/
 │       ├── index.html           # 4-button UI
 │       ├── style.css            # Responsive stylesheet
 │       └── app.js               # Frontend button interactions
-├── collector/                   # Local log collector daemon
-│   └── collector.js             # PM2 log tailer, SHA-256 fingerprinting, retry & webhook dispatcher
+├── collector/                   # Disabled legacy direct collector
+│   └── collector.js             # Opt-in migration tool; PM2-Log-Viewer is the source
 ├── langflow/                    # LangFlow docker compose, custom components & flows
 │   ├── docker-compose.yml       # Docker Compose for LangFlow with .env injection & storage
 │   ├── components/
@@ -75,7 +75,8 @@ LANGFLOW_AUTO_LOGIN=true
 LANGFLOW_API_KEY=<generated-langflow-api-key>
 LANGFLOW_WEBHOOK_URL=http://localhost:7860/api/v1/webhook/incident_to_jira
 
-# PM2 & Collector Integration
+# PM2-Log-Viewer integration (the viewer owns log ingestion and forwarding)
+DIRECT_LOG_COLLECTOR_ENABLED=false
 PM2_ERROR_LOG=runtime/pm2/button-demo-error.log
 SERVICE_NAME=button-demo
 ENVIRONMENT=local
@@ -113,12 +114,18 @@ Check PM2 status:
 node pm2.js list
 ```
 
-### Step 3: Start the Log Collector
+### Step 3: Start PM2-Log-Viewer
 
-In a separate terminal:
+In a separate terminal, start the independent viewer from its own project folder:
 ```powershell
-npm run collector
+cd ..\PM2-Log-Viewer
+npm start
 ```
+
+The viewer reads the PM2 log, normalizes incidents, displays them at
+`http://localhost:3001`, and forwards them to the LangFlow webhook. Do not run
+the legacy `npm run collector` command; it exits by default to prevent duplicate
+Jira tickets.
 
 Open the demo application UI in your browser at:
 **[http://localhost:3000](http://localhost:3000)**
@@ -131,7 +138,7 @@ The flow named `incident_to_jira` is exposed at:
 `http://localhost:7860/api/v1/webhook/incident_to_jira`
 
 ### Structure
-1. **Webhook Trigger**: Receives the normalized JSON event from the log collector with `x-api-key` header authentication.
+1. **Webhook Trigger**: Receives the normalized JSON event from PM2-Log-Viewer with `x-api-key` header authentication.
 2. **Jira Incident Handler (`jira_incident_component.py`)**:
    - Computes deterministic SHA-256 fingerprint: `sha256(service|route|error_type|message)`.
    - Derives deduplication label: `incident-<prefix>` (first 8 characters).
@@ -198,15 +205,14 @@ curl -X POST http://localhost:7860/api/v1/webhook/incident_to_jira \
      ```powershell
      Get-Content runtime/pm2/button-demo-error.log -Tail 1
      ```
-   - Observe collector log:
+   - Observe PM2-Log-Viewer delivery status:
      ```
-     [Collector] Processing error incident: route=/api/fail-one, requestId=..., fingerprint=3c479206
-     [Collector] Incident successfully sent to LangFlow (HTTP 202).
+     [PM2-Log-Viewer] ... deliveryStatus=forwarded ...
      ```
    - Verify Jira Bug ticket creation with labels `automated-incident`, `prototype`, `incident-3c479206`.
 3. **Trigger Duplicate Failure**:
    - Click **Fail Button 1** again.
-   - Verify collector detects the same fingerprint (`3c479206`).
+   - Verify PM2-Log-Viewer emits the same fingerprint (`3c479206`).
    - Verify LangFlow updates the existing Jira ticket with a recurrence comment and updated occurrence count.
 4. **Trigger Distinct Failure**:
    - Click **Fail Button 2**.

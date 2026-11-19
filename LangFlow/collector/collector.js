@@ -7,6 +7,15 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
+// The PM2-Log-Viewer is the single source of incident events. Keep this
+// legacy file collector opt-in so it cannot race the viewer and create
+// duplicate Jira tickets.
+const directCollectorEnabled = String(process.env.DIRECT_LOG_COLLECTOR_ENABLED || '').toLowerCase() === 'true';
+if (!directCollectorEnabled) {
+  console.log('[Collector] Disabled. PM2-Log-Viewer is the active incident source.');
+  process.exit(0);
+}
+
 const LANGFLOW_BASE_URL = (process.env.LANGFLOW_BASE_URL || 'http://localhost:7860').replace(/\/+$/, '');
 const LANGFLOW_API_KEY = process.env.LANGFLOW_API_KEY || '';
 const PM2_ERROR_LOG = path.resolve(__dirname, '..', process.env.PM2_ERROR_LOG || 'runtime/pm2/button-demo-error.log');

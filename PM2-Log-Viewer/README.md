@@ -170,6 +170,7 @@ Open your browser at **[http://localhost:3001](http://localhost:3001)**.
 | :--- | :--- | :--- |
 | `/api/health` | `GET` | Service status, port, uptime, log source existence, byte offset, outbox count (zero API key leakage). |
 | `/api/logs` | `GET` | Normalized incident entries (newest first). Supports `?limit=N`. |
+| `/api/incidents` | `GET` | Normalized incidents owned by this application for integrations and audits. Supports `?limit=N`. |
 | `/api/logs/:eventId` | `GET` | Detailed JSON for a specific incident by `event_id` or `request_id`. |
 | `/api/events/stream` | `GET` | Server-Sent Events (SSE) stream for real-time live push of new errors and delivery status updates. |
 | `/api/retry/:eventId` | `POST` | Manually triggers redelivery of an incident to the LangFlow webhook. |

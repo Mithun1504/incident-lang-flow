@@ -124,6 +124,7 @@ class JiraIncidentComponent(Component):
                     "type": "bulletList",
                     "content": [
                         {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Service: {incident.get('service')}"}]}]},
+                        {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Incident Source: {incident.get('source')}"}]}]},
                         {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Environment: {incident.get('environment')}"}]}]},
                         {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Endpoint: {incident.get('route')}"}]}]},
                         {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f"Timestamp: {incident.get('timestamp')}"}]}]},
@@ -191,6 +192,7 @@ class JiraIncidentComponent(Component):
 
         # Normalize required fields
         service = incident.get("service") or os.environ.get("SERVICE_NAME", "button-demo")
+        source = incident.get("source") or incident.get("source_app") or "unknown-source"
         environment = incident.get("environment") or os.environ.get("ENVIRONMENT", "local")
         route = incident.get("route", "unknown")
         error_type = incident.get("error_type", "IntentionalPrototypeError")
@@ -201,6 +203,7 @@ class JiraIncidentComponent(Component):
         log_reference = incident.get("log_reference", "runtime/pm2/button-demo-error.log")
 
         incident_norm = {
+            "source": source,
             "service": service,
             "environment": environment,
             "route": route,

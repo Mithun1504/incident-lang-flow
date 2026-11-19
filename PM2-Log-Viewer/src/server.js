@@ -91,6 +91,22 @@ app.get('/api/logs', (req, res) => {
   });
 });
 
+// Integration-friendly alias: this application owns the normalized incidents.
+// LangFlow receives the pushed webhook; this endpoint supports audits/future
+// consumers without exposing the underlying PM2 file as their data source.
+app.get('/api/incidents', (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 100;
+  const incidents = reader.getLogs().slice(0, limit).map((log) => {
+    const liveStatus = forwarder.getStatus(log.event_id);
+    return {
+      ...log,
+      deliveryStatus: liveStatus.status !== 'received' ? liveStatus.status : log.deliveryStatus,
+      deliveryDetails: liveStatus
+    };
+  });
+  res.json({ source: 'pm2-log-viewer', total: reader.getLogs().length, limit, incidents });
+});
+
 // GET /api/logs/:eventId
 app.get('/api/logs/:eventId', (req, res) => {
   const { eventId } = req.params;
