@@ -1,0 +1,21 @@
+{
+  "name": "incident-management-prototype",
+  "version": "1.0.0",
+  "description": "Incident management automation prototype with 4-button demo, PM2 log collector, LangFlow and Jira integration",
+  "main": "app/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app/server.js",
+    "pm2:start": "node pm2.js start ecosystem.config.cjs",
+    "pm2:stop": "node pm2.js stop button-demo",
+    "pm2:restart": "node pm2.js restart button-demo",
+    "pm2:logs": "node pm2.js logs button-demo",
+    "collector": "node collector/collector.js",
+    "pr:poll": "node scripts/jira_pr_poller.cjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pm2": "^5.4.3"
+  }
+}

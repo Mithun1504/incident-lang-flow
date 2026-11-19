@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM2 Log Viewer & Incident Forwarder</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">PM2 Log Viewer</h1>
+          <p class="brand-subtitle">Incremental Error Monitor & LangFlow Incident Forwarder</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="connection-status" id="connectionStatus">
+          <span class="status-indicator live"></span>
+          <span class="status-text" id="connectionText">Connecting...</span>
+        </div>
+
+        <div class="mode-toggle-wrapper">
+          <span class="mode-label">Mode:</span>
+          <button id="toggleForwardBtn" class="mode-badge forwarding" title="Click to toggle dry-run mode">
+            Forwarding: ON
+          </button>
+        </div>
+
+        <button id="refreshBtn" class="btn btn-secondary" title="Refresh logs from server">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Bar -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <span class="metric-label">Total Errors</span>
+        <div class="metric-value" id="metricTotal">0</div>
+        <span class="metric-meta" id="metricSourceFile">Source: loading...</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-label">Forwarded to LangFlow</span>
+        <div class="metric-value text-success" id="metricForwarded">0</div>
+        <span class="metric-meta">Dispatched to Jira Webhook</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-label">Pending / Outbox</span>
+        <div class="metric-value text-warning" id="metricPending">0</div>
+        <span class="metric-meta" id="metricOutboxInfo">Local retry queue</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-label">Reader Byte Offset</span>
+        <div class="metric-value mono" id="metricOffset">0 B</div>
+        <span class="metric-meta" id="metricLastSeen">Incremental tracking</span>
+      </div>
+    </section>
+
+    <!-- Toolbar: Filters and Search -->
+    <section class="toolbar">
+      <div class="search-box">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="searchInput" placeholder="Search by route, error, message, request ID, fingerprint..." />
+      </div>
+
+      <div class="filter-controls">
+        <select id="statusFilter" class="select-dropdown">
+          <option value="all">All Delivery Statuses</option>
+          <option value="forwarded">Forwarded</option>
+          <option value="received">Received</option>
+          <option value="retrying">Retrying</option>
+          <option value="failed">Failed</option>
+          <option value="dry-run">Dry-Run</option>
+        </select>
+
+        <button id="flushOutboxBtn" class="btn btn-outline" title="Trigger retry for pending outbox items">
+          Retry Outbox (<span id="outboxCount">0</span>)
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Content: Log Stream -->
+    <main class="log-stream-container">
+      <div class="stream-header">
+        <div class="stream-title-group">
+          <h2 class="stream-title">Error Incidents</h2>
+          <span class="stream-count badge" id="visibleCount">0 entries</span>
+        </div>
+        <div class="stream-actions">
+          <span class="help-hint">Newest errors appear at top in real-time</span>
+        </div>
+      </div>
+
+      <div id="logsList" class="logs-list">
+        <!-- Rendered dynamically -->
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading PM2 error logs...</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>PM2 Log Viewer • Port 3001</span>
+      <span>Target Webhook: <code id="webhookTarget">...</code></span>
+      <span>State File: <code>runtime/log-viewer-state.json</code></span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

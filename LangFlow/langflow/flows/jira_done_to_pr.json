@@ -1,0 +1,84 @@
+{
+  "name": "jira_done_to_pr",
+  "description": "Create a GitHub PR from a manually pushed fix/<JIRA-KEY> branch when Jira reaches Done.",
+  "webhook": true,
+  "endpoint_name": "jira_done_to_pr",
+  "data": {
+    "nodes": [
+      {
+        "id": "Webhook-jira-pr",
+        "type": "genericNode",
+        "position": {
+          "x": 500,
+          "y": 200
+        },
+        "data": {
+          "id": "Webhook-jira-pr",
+          "type": "CustomComponent",
+          "node": {
+            "display_name": "Jira Done to GitHub PR",
+            "description": "Creates a GitHub PR from fix/<JIRA-KEY> after a Jira issue reaches Done.",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any, Dict, Optional\n\nfrom langflow.custom import Component\nfrom langflow.io import MultilineInput, Output\nfrom langflow.schema import Data\n\n\nclass JiraDoneToGitHubPRComponent(Component):\n    \"\"\"Create one GitHub PR for a manually pushed Jira fix branch.\n\n    The repository is deliberately configured server-side for this prototype.\n    The incoming Jira event can select the issue, but cannot select an arbitrary\n    repository or target branch.\n    \"\"\"\n\n    display_name = \"Jira Done to GitHub PR\"\n    description = \"Creates a GitHub PR from fix/<JIRA-KEY> after a Jira issue reaches Done.\"\n    icon = \"github\"\n    name = \"JiraDoneToGitHubPR\"\n\n    inputs = [\n        MultilineInput(\n            name=\"data\",\n            display_name=\"Jira Webhook Payload\",\n            info=\"Raw JSON body injected by the LangFlow webhook endpoint.\",\n            advanced=True,\n            input_types=[],\n            required=False,\n        )\n    ]\n\n    outputs = [\n        Output(display_name=\"Result Data\", name=\"result\", method=\"process_event\"),\n        Output(display_name=\"Jira Issue Key\", name=\"issue_key\", method=\"get_issue_key\"),\n        Output(display_name=\"Pull Request URL\", name=\"pr_url\", method=\"get_pr_url\"),\n    ]\n\n    def _jira_auth(self) -> str:\n        raw = f\"{os.environ.get('JIRA_EMAIL', '').strip()}:{os.environ.get('JIRA_API_TOKEN', '').strip()}\"\n        return \"Basic \" + base64.b64encode(raw.encode(\"utf-8\")).decode(\"ascii\")\n\n    def _github_call(self, endpoint: str, method: str = \"GET\", body: Optional[dict] = None) -> Dict[str, Any] | list:\n        token = os.environ.get(\"GITHUB_TOKEN\", \"\").strip()\n        if not token:\n            raise ValueError(\"GITHUB_TOKEN is not configured\")\n        url = \"https://api.github.com\" + endpoint\n        headers = {\n            \"Authorization\": f\"Bearer {token}\",\n            \"Accept\": \"application/vnd.github+json\",\n            \"X-GitHub-Api-Version\": \"2022-11-28\",\n            \"User-Agent\": \"langflow-jira-pr-prototype\",\n        }\n        payload = json.dumps(body).encode(\"utf-8\") if body is not None else None\n        if payload is not None:\n            headers[\"Content-Type\"] = \"application/json\"\n        request = urllib.request.Request(url, data=payload, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode(\"utf-8\")\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(\"utf-8\", errors=\"replace\") if error.fp else \"\"\n            raise RuntimeError(f\"GitHub API error ({error.code}) {method} {endpoint}: {detail[:500]}\") from error\n        except Exception as error:\n            raise RuntimeError(f\"GitHub request failed {method} {endpoint}: {error}\") from error\n\n    def _jira_call(self, endpoint: str, method: str = \"GET\", body: Optional[dict] = None) -> Dict[str, Any] | list:\n        base_url = os.environ.get(\"JIRA_BASE_URL\", \"\").rstrip(\"/\")\n        if not base_url or not os.environ.get(\"JIRA_EMAIL\") or not os.environ.get(\"JIRA_API_TOKEN\"):\n            raise ValueError(\"Jira credentials are not configured\")\n        payload = json.dumps(body).encode(\"utf-8\") if body is not None else None\n        request = urllib.request.Request(\n            f\"{base_url}{endpoint}\",\n            data=payload,\n            headers={\n                \"Authorization\": self._jira_auth(),\n                \"Accept\": \"application/json\",\n                \"Content-Type\": \"application/json\",\n            },\n            method=method,\n        )\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode(\"utf-8\")\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(\"utf-8\", errors=\"replace\") if error.fp else \"\"\n            raise RuntimeError(f\"Jira API error ({error.code}) {method} {endpoint}: {detail[:500]}\") from error\n        except Exception as error:\n            raise RuntimeError(f\"Jira request failed {method} {endpoint}: {error}\") from error\n\n    @staticmethod\n    def _payload_value(payload: dict, *keys: str) -> Any:\n        for key in keys:\n            if payload.get(key) is not None:\n                return payload[key]\n        return None\n\n    def _parse_event(self) -> dict:\n        raw = self.data\n        if hasattr(raw, \"data\") and isinstance(raw.data, dict) and raw.data:\n            return raw.data\n        if hasattr(raw, \"text\"):\n            raw = raw.text or getattr(raw, \"default_value\", \"\")\n        if isinstance(raw, dict):\n            return raw\n        if not isinstance(raw, str) or not raw.strip():\n            return {}\n        try:\n            return json.loads(raw)\n        except json.JSONDecodeError as error:\n            raise ValueError(f\"Jira webhook payload is not valid JSON: {error}\") from error\n\n    def _issue_context(self, payload: dict) -> tuple[str, str, dict]:\n        issue = payload.get(\"issue\") if isinstance(payload.get(\"issue\"), dict) else payload\n        fields = issue.get(\"fields\") if isinstance(issue.get(\"fields\"), dict) else {}\n        status = fields.get(\"status\") if isinstance(fields.get(\"status\"), dict) else {}\n        issue_key = str(self._payload_value(issue, \"key\", \"issue_key\") or payload.get(\"issue_key\") or \"\").strip()\n        status_name = str(\n            self._payload_value(status, \"name\")\n            or self._payload_value(payload, \"status\", \"status_name\")\n            or \"\"\n        ).strip()\n        return issue_key, status_name, issue\n\n    def _comment_jira(self, issue_key: str, text: str) -> None:\n        body = {\n            \"body\": {\n                \"type\": \"doc\",\n                \"version\": 1,\n                \"content\": [{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": text}]}],\n            }\n        }\n        self._jira_call(f\"/rest/api/3/issue/{urllib.parse.quote(issue_key)}/comment\", \"POST\", body)\n\n    def _transition_jira(self, issue_key: str, target_status: str) -> str:\n        transitions = self._jira_call(\n            f\"/rest/api/3/issue/{urllib.parse.quote(issue_key)}/transitions\", \"GET\"\n        )\n        for transition in transitions.get(\"transitions\", []) if isinstance(transitions, dict) else []:\n            to = transition.get(\"to\") or {}\n            if str(to.get(\"name\", \"\")).casefold() == target_status.casefold():\n                self._jira_call(\n                    f\"/rest/api/3/issue/{urllib.parse.quote(issue_key)}/transitions\",\n                    \"POST\",\n                    {\"transition\": {\"id\": transition[\"id\"]}},\n                )\n                return str(to.get(\"name\") or target_status)\n        return \"\"\n\n    def process_event(self) -> Data:\n        self._last_issue_key = \"\"\n        self._last_pr_url = \"\"\n        payload = self._parse_event()\n        issue_key, status_name, issue = self._issue_context(payload)\n        self._last_issue_key = issue_key\n        trigger_status = os.environ.get(\"JIRA_PR_TRIGGER_STATUS\", \"Done\").strip() or \"Done\"\n\n        if not issue_key:\n            return Data(data={\"status\": \"error\", \"error\": \"Jira issue key is missing\"})\n        if status_name.casefold() != trigger_status.casefold():\n            return Data(data={\"status\": \"ignored\", \"reason\": f\"status is {status_name or 'unknown'}\", \"issue_key\": issue_key})\n\n        owner = os.environ.get(\"GITHUB_OWNER\", \"anuraag-bagepalli\").strip()\n        repository = os.environ.get(\"GITHUB_REPOSITORY\", \"incident-demo-app\").strip()\n        base_branch = os.environ.get(\"GITHUB_BASE_BRANCH\", \"main\").strip() or \"main\"\n        branch = f\"fix/{issue_key}\"\n        encoded_repo = f\"{urllib.parse.quote(owner)}/{urllib.parse.quote(repository)}\"\n\n        try:\n            self._github_call(f\"/repos/{encoded_repo}/branches/{urllib.parse.quote(branch, safe='')}\")\n        except RuntimeError as error:\n            message = f\"Branch {branch} is not available in {owner}/{repository}. Push it before marking the ticket Done.\"\n            try:\n                self._comment_jira(issue_key, message)\n            except Exception:\n                pass\n            return Data(data={\"status\": \"blocked\", \"reason\": \"missing_branch\", \"issue_key\": issue_key, \"branch\": branch, \"error\": str(error)})\n\n        query = urllib.parse.urlencode({\"state\": \"open\", \"head\": f\"{owner}:{branch}\", \"base\": base_branch, \"per_page\": \"10\"})\n        existing = self._github_call(f\"/repos/{encoded_repo}/pulls?{query}\", \"GET\")\n        prs = existing if isinstance(existing, list) else []\n        if prs:\n            pr_url = str(prs[0].get(\"html_url\") or \"\")\n            action = \"existing_pr\"\n        else:\n            summary = ((issue.get(\"fields\") or {}).get(\"summary\") or f\"Fix {issue_key}\").strip()\n            created = self._github_call(\n                f\"/repos/{encoded_repo}/pulls\",\n                \"POST\",\n                {\n                    \"title\": f\"Fix {issue_key}: {summary}\",\n                    \"head\": branch,\n                    \"base\": base_branch,\n                    \"body\": f\"Fixes {issue_key}\\n\\nCreated from the developer's pushed branch.\",\n                    \"draft\": False,\n                },\n            )\n            pr_url = str(created.get(\"html_url\") or \"\")\n            action = \"created_pr\"\n\n        self._last_pr_url = pr_url\n        try:\n            self._comment_jira(issue_key, f\"GitHub PR ({action}): {pr_url}\")\n        except Exception as error:\n            return Data(data={\"status\": \"partial\", \"action\": action, \"issue_key\": issue_key, \"pr_url\": pr_url, \"error\": str(error)})\n\n        raised_status = os.environ.get(\"JIRA_PR_RAISED_STATUS\", \"PR Raised\").strip() or \"PR Raised\"\n        transitioned_to = self._transition_jira(issue_key, raised_status)\n        return Data(data={\"status\": \"success\", \"action\": action, \"issue_key\": issue_key, \"branch\": branch, \"pr_url\": pr_url, \"jira_status\": transitioned_to or raised_status})\n\n    def get_issue_key(self) -> str:\n        return getattr(self, \"_last_issue_key\", \"\")\n\n    def get_pr_url(self) -> str:\n        return getattr(self, \"_last_pr_url\", \"\")\n",
+                "type": "code"
+              },
+              "data": {
+                "_input_type": "MultilineInput",
+                "advanced": true,
+                "api_editable": false,
+                "display_name": "Jira Webhook Payload",
+                "input_types": [],
+                "name": "data",
+                "required": false,
+                "show": true,
+                "type": "str",
+                "value": ""
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result Data",
+                "types": [
+                  "Data"
+                ],
+                "method": "process_event",
+                "selected": "Data"
+              },
+              {
+                "name": "issue_key",
+                "display_name": "Jira Issue Key",
+                "types": [
+                  "str"
+                ],
+                "method": "get_issue_key",
+                "selected": "str"
+              },
+              {
+                "name": "pr_url",
+                "display_name": "Pull Request URL",
+                "types": [
+                  "str"
+                ],
+                "method": "get_pr_url",
+                "selected": "str"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "edges": [],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  }
+}

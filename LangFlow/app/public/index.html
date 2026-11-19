@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Management Prototype - Four Button Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body id="page-body">
+  <div class="container">
+    <header>
+      <h1>Incident Management Prototype</h1>
+      <p class="subtitle">Phase 1: Local Automation Pipeline</p>
+    </header>
+
+    <div class="card workflow-card">
+      <h2>Workflow Pipeline</h2>
+      <div class="pipeline">
+        <span class="step active">1. Button Action</span> &rarr;
+        <span class="step">2. Express Backend</span> &rarr;
+        <span class="step">3. PM2 Log</span> &rarr;
+        <span class="step">4. Collector</span> &rarr;
+        <span class="step">5. LangFlow Webhook</span> &rarr;
+        <span class="step">6. Jira Bug Ticket</span>
+      </div>
+    </div>
+
+    <div class="card button-card">
+      <h2>Action Controls</h2>
+      <div class="button-grid">
+        <div class="button-box">
+          <button id="btn-success-red" class="btn btn-red">
+            <span class="icon">&#10004;</span> Success 1 (Turn Red)
+          </button>
+          <p class="desc">Calls <code>/api/success-red</code> (HTTP 200). Background turns red.</p>
+        </div>
+
+        <div class="button-box">
+          <button id="btn-success-blue" class="btn btn-blue">
+            <span class="icon">&#10004;</span> Success 2 (Turn Blue)
+          </button>
+          <p class="desc">Calls <code>/api/success-blue</code> (HTTP 200). Background turns blue.</p>
+        </div>
+
+        <div class="button-box">
+          <button id="btn-fail-one" class="btn btn-danger">
+            <span class="icon">&#9888;</span> Fail Button 1
+          </button>
+          <p class="desc">Calls <code>/api/fail-one</code> (HTTP 500). Logs error & triggers Jira ticket.</p>
+        </div>
+
+        <div class="button-box">
+          <button id="btn-fail-two" class="btn btn-danger">
+            <span class="icon">&#9888;</span> Fail Button 2
+          </button>
+          <p class="desc">Calls <code>/api/fail-two</code> (HTTP 500). Logs error & triggers Jira ticket.</p>
+        </div>
+      </div>
+
+      <div class="controls-action">
+        <button id="btn-reset-color" class="btn btn-secondary">Reset Page Background</button>
+      </div>
+    </div>
+
+    <div class="card status-card">
+      <h2>Response & Telemetry</h2>
+      <div id="status-indicator" class="status-indicator idle">
+        Ready. Click any button above to test.
+      </div>
+
+      <div class="meta-row">
+        <div><strong>Last Endpoint:</strong> <span id="meta-endpoint">-</span></div>
+        <div><strong>Status Code:</strong> <span id="meta-status">-</span></div>
+        <div><strong>Request ID:</strong> <span id="meta-request-id">-</span></div>
+      </div>
+
+      <div class="output-container">
+        <label>Latest Response Payload:</label>
+        <pre id="response-output">No requests sent yet.</pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

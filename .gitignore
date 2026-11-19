@@ -1,0 +1,22 @@
+# Credentials and local configuration
+**/.env
+**/.env.local
+**/.env.*.local
+*.pem
+*.key
+
+# Dependencies
+**/node_modules/
+
+# Runtime logs, state, and local databases
+**/runtime/
+**/*.log
+**/*.db
+**/langflow_data/
+
+# Tool/editor files
+.DS_Store
+.vscode/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

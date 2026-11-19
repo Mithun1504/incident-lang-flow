@@ -1,0 +1,19 @@
+{
+  "name": "incident-demo-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Four-button demo application for incident-to-Jira automation",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop incident-demo-app",
+    "pm2:restart": "pm2 restart incident-demo-app"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pm2": "^5.4.3"
+  }
+}
