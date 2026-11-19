@@ -84,6 +84,7 @@ class TicketTests(unittest.TestCase):
         node = Ticket(); node.incident = Data(INCIDENT); node._call = call
         self.assertEqual(node.process().data['issue_key'], 'SUP-3')
         self.assertIn('project = "SUP"', calls[0][2]['jql'])
+        self.assertIn('statusCategory != Done', calls[0][2]['jql'])
         self.assertEqual(calls[1][2]['fields']['summary'], 'button-demo (local): IntentionalPrototypeError on /api/fail-two')
 
     def test_writer_rejects_missing_fields(self):

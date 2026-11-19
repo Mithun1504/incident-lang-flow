@@ -96,7 +96,9 @@ class JiraTicketWriter(Component):
         label = str(incident.get("dedup_label") or f"incident-{str(incident.get('fingerprint', ''))[:8]}")
         result = dict(incident)
         result["jira_label"] = label
-        search = self._call("/rest/api/3/search/jql", "POST", {"jql": f'project = "{project}" AND labels = "{label}" ORDER BY created DESC', "maxResults": 1, "fields": ["description", "summary"]})
+        # A recurrence after completion is a new incident lifecycle. Use the
+        # status category, since legacy completed issues may lack Resolution.
+        search = self._call("/rest/api/3/search/jql", "POST", {"jql": f'project = "{project}" AND labels = "{label}" AND statusCategory != Done ORDER BY created DESC', "maxResults": 1, "fields": ["description", "summary"]})
         existing = (search.get("issues") or [None])[0]
         if existing:
             key = existing.get("key")

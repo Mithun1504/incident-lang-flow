@@ -159,7 +159,7 @@ The flow named `incident_to_jira` is exposed at:
 1. **Webhook Trigger** receives the viewer event using `x-api-key`.
 2. **Normalize Incident** unwraps Data/Message/string transport payloads, including literal newlines in stack traces. Missing route, error type, or message fails the run rather than creating a placeholder ticket.
 3. **Fingerprint Incident** preserves the viewer fingerprint (16 hexadecimal characters) or computes SHA-256 when absent; the first eight characters form the Jira label.
-4. **Create or Update Jira Ticket** searches the configured project by label, creates the configured issue type, or records recurrence on the existing issue. Titles are readable, for example `button-demo (local): IntentionalPrototypeError on /api/fail-two`. Telemetry and fingerprint remain in the description.
+4. **Create or Update Jira Ticket** searches active issues in the configured project by label, creates the configured issue type, or records recurrence on the existing active issue. Completed/Done-category issues are excluded, so an error after completion starts a new ticket. Titles are readable, for example `button-demo (local): IntentionalPrototypeError on /api/fail-two`. Telemetry and fingerprint remain in the description.
 
 The current graphs use `flow_*.py`. The older all-in-one components and repair/create scripts are legacy and should not be used to deploy the multi-node graphs.
 
