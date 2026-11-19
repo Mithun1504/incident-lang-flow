@@ -90,6 +90,24 @@ STATE_FILE=runtime/collector-state.json
 
 ## 4. How to Start the Prototype Services
 
+### Visual LangFlow pipelines
+
+The saved flows are intentionally multi-node graphs:
+
+```text
+incident_to_jira:
+PM2-Log-Viewer Webhook → Normalize Incident → Fingerprint Incident → Create or Update Jira Ticket
+
+jira_done_to_pr:
+Jira Webhook → Parse Jira Event → Check Jira Status → Prepare PR Context → Create GitHub PR
+```
+
+To rebuild the visual graphs after changing a component:
+
+```powershell
+npm run flows:rebuild
+```
+
 ### Step 1: Start LangFlow (Docker Compose)
 
 From the project root:

@@ -11,7 +11,8 @@
     "pm2:restart": "node pm2.js restart button-demo",
     "pm2:logs": "node pm2.js logs button-demo",
     "collector": "node collector/collector.js",
-    "pr:poll": "node scripts/jira_pr_poller.cjs"
+    "pr:poll": "node scripts/jira_pr_poller.cjs",
+    "flows:rebuild": "node scripts/rebuild_visual_flows.cjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
