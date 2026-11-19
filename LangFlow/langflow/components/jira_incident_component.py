@@ -158,6 +158,49 @@ class JiraIncidentComponent(Component):
             ]
         }
 
+    @staticmethod
+    def _parse_json_text(value: str) -> Optional[dict]:
+        """Parse webhook text, including LangFlow's prefixed/wrapped form."""
+        text = str(value or "").strip()
+        candidates = [text]
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            candidates.append(text[start:end + 1])
+
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+
+            # Some LangFlow message coercions turn escaped JSON newlines into
+            # literal control characters inside a JSON string. Escape those
+            # controls only while inside quoted JSON text, then retry.
+            sanitized = []
+            in_string = False
+            escaped = False
+            for char in candidate:
+                if char == '"' and not escaped:
+                    in_string = not in_string
+                if in_string and char in "\r\n\t":
+                    sanitized.append({"\r": "\\r", "\n": "\\n", "\t": "\\t"}[char])
+                else:
+                    sanitized.append(char)
+                if char == "\\" and not escaped:
+                    escaped = True
+                else:
+                    escaped = False
+            try:
+                parsed = json.loads("".join(sanitized))
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
+        return None
+
     def process_incident(self) -> Data:
         # Extract incident dictionary from input
         raw_data = self.data or self.incident_input
@@ -171,24 +214,42 @@ class JiraIncidentComponent(Component):
             else:
                 text_value = getattr(raw_data, "text", None) or getattr(raw_data, "default_value", None)
                 if isinstance(text_value, str):
-                    try:
-                        incident = json.loads(text_value)
-                    except Exception:
-                        incident = {"message": text_value}
+                    incident = self._parse_json_text(text_value) or {"message": text_value}
                 else:
                     incident = {}
         elif isinstance(raw_data, dict):
             incident = raw_data
         elif isinstance(raw_data, str):
-            try:
-                incident = json.loads(raw_data)
-            except Exception:
-                incident = {"message": raw_data}
+            incident = self._parse_json_text(raw_data) or {"message": raw_data}
         else:
             try:
                 incident = dict(raw_data)
             except Exception:
                 incident = {}
+
+        # LangFlow's Webhook/Data adapters can wrap the JSON body one or more
+        # times (for example {"data": { ...incident... }}). Unwrap those
+        # transport envelopes before normalizing so route/message/source are
+        # preserved from PM2-Log-Viewer.
+        for _ in range(3):
+            if not isinstance(incident, dict):
+                break
+            nested = None
+            for wrapper_key in ("data", "payload", "incident"):
+                candidate = incident.get(wrapper_key)
+                if isinstance(candidate, dict):
+                    nested = candidate
+                    break
+                if isinstance(candidate, str) and candidate.strip().startswith("{"):
+                    try:
+                        nested = json.loads(candidate)
+                    except Exception:
+                        nested = None
+                    if isinstance(nested, dict):
+                        break
+            if not isinstance(nested, dict) or nested is incident:
+                break
+            incident = nested
 
         # Normalize required fields
         service = incident.get("service") or os.environ.get("SERVICE_NAME", "button-demo")
