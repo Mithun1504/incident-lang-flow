@@ -92,6 +92,32 @@ async function runFlow(issue) {
   }
 }
 
+// Polling Jira is cheap; launching a graph is reserved for a ready fix.
+async function fixReadiness(issueKey) {
+  const owner = process.env.GITHUB_OWNER;
+  const repository = process.env.GITHUB_REPOSITORY;
+  const token = process.env.GITHUB_TOKEN;
+  if (!owner || !repository || !token) throw new Error("GitHub repository and token are required to check fix readiness");
+  const branch = `${process.env.GITHUB_BRANCH_PREFIX || "fix/"}${issueKey}`;
+  const base = process.env.GITHUB_BASE_BRANCH || "main";
+  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}`;
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(20000),
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+  });
+  if (response.status === 404) return { ready: false, reason: "branch_or_base_missing", branch };
+  if (!response.ok) throw new Error(`GitHub readiness check HTTP ${response.status}`);
+  const comparison = await response.json();
+  return { ready: comparison.ahead_by > 0, reason: comparison.ahead_by > 0 ? "ready" : "no_commits", branch, sha: comparison.head_commit?.sha };
+}
+
+function retryDue(previous, revision, now = Date.now()) {
+  return previous?.revision !== revision || !previous?.nextAttemptAt || Date.parse(previous.nextAttemptAt) <= now;
+}
+function retryDelay(attempts) {
+  return Math.min(300000, 60000 * 2 ** Math.min(Math.max(0, attempts - 1), 3));
+}
+
 async function waitForPrComment(issueKey) {
   await new Promise((resolve) => setTimeout(resolve, 6000));
   const issue = await jiraRequest(`/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=comment,status,updated`);
@@ -110,19 +136,34 @@ async function pollOnce(issueKey = "") {
     }
     if (state[key]?.status === "completed" && state[key]?.updated === issue.fields?.updated) continue;
 
+    let revision;
+    let attempts = 0;
     try {
+      const readiness = await fixReadiness(key);
+      if (!readiness.ready) {
+        if (state[key]?.reason !== readiness.reason) console.log(`[Jira PR Poller] ${key}: waiting for pushed fix (${readiness.reason}); flow not triggered`);
+        state[key] = { status: "waiting_for_fix", reason: readiness.reason, updated: issue.fields?.updated || null };
+        continue;
+      }
+      revision = `${issue.fields?.updated || ""}:${readiness.sha || ""}`;
+      if (!retryDue(state[key], revision)) continue;
+      attempts = state[key]?.revision === revision ? (state[key].attempts || 0) + 1 : 1;
       console.log(`[Jira PR Poller] Processing ${key} (${triggerStatus})`);
       await runFlow(issue);
       const complete = await waitForPrComment(key);
       state[key] = {
         status: complete ? "completed" : "pending",
+        revision, attempts,
+        nextAttemptAt: complete ? null : new Date(Date.now() + retryDelay(attempts)).toISOString(),
         updated: issue.fields?.updated || null,
         lastAttemptAt: new Date().toISOString(),
       };
       saveState();
       console.log(`[Jira PR Poller] ${key}: ${complete ? "PR confirmed" : "still pending"}`);
     } catch (error) {
-      state[key] = { status: "pending", updated: issue.fields?.updated || null, lastError: error.message, lastAttemptAt: new Date().toISOString() };
+      state[key] = { status: "pending", revision, attempts,
+        nextAttemptAt: new Date(Date.now() + retryDelay(attempts || 1)).toISOString(),
+        updated: issue.fields?.updated || null, lastError: error.message, lastAttemptAt: new Date().toISOString() };
       saveState();
       console.warn(`[Jira PR Poller] ${key} failed: ${error.message}`);
     }
@@ -146,7 +187,7 @@ async function main() {
   await tick();
 }
 
-module.exports = { issueQuery, findDoneIssues, pollOnce, runFlow };
+module.exports = { issueQuery, findDoneIssues, pollOnce, runFlow, fixReadiness, retryDue, retryDelay };
 if (require.main === module) {
   main().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }

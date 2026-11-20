@@ -351,3 +351,13 @@ LangFlow Python installation or credentials.
 The embedded running demo and standalone developer repository are separate
 copies. Pushing a fix does not change the embedded demo until you explicitly
 deploy the updated application.
+
+### Watcher execution control
+
+The watcher checks GitHub for commits ahead of the base branch before sending a
+resolved Jira event to LangFlow. Missing or empty fix branches stay in
+`waiting_for_fix` locally and do not execute the graph. A newly pushed fix is
+detected on a later poll. Unconfirmed executions retry with a 1 to 5 minute
+backoff; changed Jira update timestamps or branch commit SHAs allow immediate
+reprocessing. Existing PR-link comments continue to suppress completed work.
+Restart the watcher after updating this script; no flow rebuild is needed.
