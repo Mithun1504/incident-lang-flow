@@ -1,0 +1,1534 @@
+{
+  "name": "Incident Lifecycle",
+  "description": "Error → Jira → developer fix → resolved Jira event → verified GitHub PR. One event-routed workflow with inspectable results.",
+  "webhook": true,
+  "endpoint_name": "incident_to_jira",
+  "data": {
+    "nodes": [
+      {
+        "id": "Webhook-lifecycle",
+        "type": "genericNode",
+        "position": {
+          "x": 80,
+          "y": 160
+        },
+        "data": {
+          "id": "Webhook-lifecycle",
+          "type": "Webhook",
+          "node": {
+            "base_classes": [
+              "JSON"
+            ],
+            "beta": false,
+            "conditional_paths": [],
+            "custom_fields": {},
+            "display_name": "Receive Lifecycle Event",
+            "documentation": "https://docs.langflow.org/component-webhook",
+            "edited": false,
+            "field_order": [
+              "data",
+              "curl",
+              "endpoint"
+            ],
+            "frozen": false,
+            "icon": "webhook",
+            "legacy": false,
+            "metadata": {
+              "code_hash": "e99e2452d56e",
+              "component_class_name": "WebhookComponent",
+              "dependencies": {
+                "dependencies": [
+                  {
+                    "name": "lfx",
+                    "version": null
+                  }
+                ],
+                "total_dependencies": 1
+              },
+              "module": "lfx.components.input_output.webhook.WebhookComponent"
+            },
+            "minimized": false,
+            "output_types": [],
+            "outputs": [
+              {
+                "allows_loop": false,
+                "cache": true,
+                "display_name": "JSON",
+                "group_outputs": false,
+                "method": "build_data",
+                "name": "output_data",
+                "selected": "JSON",
+                "tool_mode": true,
+                "types": [
+                  "JSON"
+                ],
+                "value": "__UNDEFINED__"
+              }
+            ],
+            "pinned": false,
+            "template": {
+              "_type": "Component",
+              "code": {
+                "advanced": true,
+                "api_editable": false,
+                "dynamic": true,
+                "fileTypes": [],
+                "file_path": "",
+                "info": "",
+                "list": false,
+                "load_from_db": false,
+                "multiline": true,
+                "name": "code",
+                "password": false,
+                "placeholder": "",
+                "required": true,
+                "show": true,
+                "title_case": false,
+                "type": "code",
+                "value": "import json\n\nfrom lfx.custom.custom_component.component import Component\nfrom lfx.io import MultilineInput, Output\nfrom lfx.schema.data import Data\n\n\nclass WebhookComponent(Component):\n    display_name = \"Webhook\"\n    documentation: str = \"https://docs.langflow.org/component-webhook\"\n    name = \"Webhook\"\n    icon = \"webhook\"\n\n    inputs = [\n        MultilineInput(\n            name=\"data\",\n            display_name=\"Payload\",\n            info=\"Receives a payload from external systems via HTTP POST.\",\n            advanced=True,\n        ),\n        MultilineInput(\n            name=\"curl\",\n            display_name=\"cURL\",\n            value=\"CURL_WEBHOOK\",\n            advanced=True,\n            input_types=[],\n        ),\n        MultilineInput(\n            name=\"endpoint\",\n            display_name=\"Endpoint\",\n            value=\"BACKEND_URL\",\n            advanced=False,\n            copy_field=True,\n            input_types=[],\n        ),\n    ]\n    outputs = [\n        Output(display_name=\"JSON\", name=\"output_data\", method=\"build_data\"),\n    ]\n\n    def build_data(self) -> Data:\n        message: str | Data = \"\"\n        if not self.data:\n            self.status = \"No data provided.\"\n            return Data(data={})\n        try:\n            my_data = self.data.replace('\"\\n\"', '\"\\\\n\"')\n            body = json.loads(my_data or \"{}\")\n        except json.JSONDecodeError:\n            body = {\"payload\": self.data}\n            message = f\"Invalid JSON payload. Please check the format.\\n\\n{self.data}\"\n        data = Data(data=body)\n        if not message:\n            message = data\n        self.status = message\n        return data\n"
+              },
+              "curl": {
+                "_input_type": "MultilineInput",
+                "advanced": true,
+                "ai_enabled": false,
+                "api_editable": false,
+                "copy_field": false,
+                "display_name": "cURL",
+                "dynamic": false,
+                "info": "",
+                "input_types": [],
+                "list": false,
+                "list_add_label": "Add More",
+                "load_from_db": false,
+                "multiline": true,
+                "name": "curl",
+                "override_skip": false,
+                "password": false,
+                "placeholder": "",
+                "required": false,
+                "show": true,
+                "title_case": false,
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "track_in_telemetry": false,
+                "type": "str",
+                "value": "CURL_WEBHOOK"
+              },
+              "data": {
+                "_input_type": "MultilineInput",
+                "advanced": true,
+                "ai_enabled": false,
+                "api_editable": false,
+                "copy_field": false,
+                "display_name": "Payload",
+                "dynamic": false,
+                "info": "Receives a payload from external systems via HTTP POST.",
+                "input_types": [
+                  "Message"
+                ],
+                "list": false,
+                "list_add_label": "Add More",
+                "load_from_db": false,
+                "multiline": true,
+                "name": "data",
+                "override_skip": false,
+                "password": false,
+                "placeholder": "",
+                "required": false,
+                "show": true,
+                "title_case": false,
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "track_in_telemetry": false,
+                "type": "str",
+                "value": "{\"event_type\":\"preview\"}"
+              },
+              "endpoint": {
+                "_input_type": "MultilineInput",
+                "advanced": false,
+                "ai_enabled": false,
+                "api_editable": false,
+                "copy_field": true,
+                "display_name": "Endpoint",
+                "dynamic": false,
+                "info": "",
+                "input_types": [],
+                "list": false,
+                "list_add_label": "Add More",
+                "load_from_db": false,
+                "multiline": true,
+                "name": "endpoint",
+                "override_skip": false,
+                "password": false,
+                "placeholder": "",
+                "required": false,
+                "show": true,
+                "title_case": false,
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "track_in_telemetry": false,
+                "type": "str",
+                "value": "BACKEND_URL"
+              }
+            },
+            "tool_mode": false,
+            "id": "Webhook-lifecycle",
+            "description": "One authenticated entry point for error events and Jira status changes."
+          }
+        },
+        "width": 300,
+        "height": 220,
+        "selected": false
+      },
+      {
+        "id": "Route-lifecycle",
+        "type": "genericNode",
+        "position": {
+          "x": 440,
+          "y": 160
+        },
+        "data": {
+          "id": "Route-lifecycle",
+          "type": "CustomComponent",
+          "node": {
+            "name": "LifecycleEventRouter",
+            "display_name": "Route Lifecycle Event",
+            "description": "Selects one branch. Informational and incomplete events have no external side effects.",
+            "icon": "split",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import json\nfrom typing import Any\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\nclass LifecycleEventRouter(Component):\n    display_name = \"Route Lifecycle Event\"\n    description = \"Classifies error and Jira events; excludes every inactive branch.\"\n    icon = \"split\"\n    name = \"LifecycleEventRouter\"\n    inputs = [HandleInput(name=\"input_data\", display_name=\"Incoming Event\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False)]\n    outputs = [\n        Output(display_name=\"Application error\", name=\"incident\", method=\"incident_event\", group_outputs=True),\n        Output(display_name=\"Jira status event\", name=\"jira\", method=\"jira_event\", group_outputs=True),\n        Output(display_name=\"Ignored event\", name=\"ignored\", method=\"ignored_event\", group_outputs=True),\n    ]\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        # Webhook/Message adapters can wrap JSON strings and materialize the\n        # escaped newlines inside stack traces. Never discard Message.text\n        # just because its data attribute is empty.\n        for _ in range(12):\n            if not isinstance(value, (dict, str)):\n                data = getattr(value, \"data\", None)\n                value = data if isinstance(data, dict) else getattr(value, \"text\", None) or getattr(value, \"default_value\", None)\n            if isinstance(value, str):\n                text = value.strip()\n                start, end = text.find(\"{\"), text.rfind(\"}\")\n                candidates = [text]\n                if start >= 0 and end > start:\n                    candidates.append(text[start:end + 1])\n                for candidate in candidates:\n                    try:\n                        value = json.loads(candidate, strict=False)\n                        break\n                    except (ValueError, TypeError):\n                        continue\n                else:\n                    raise ValueError(\"Webhook payload must contain a JSON object\")\n                continue\n            if isinstance(value, dict):\n                for key in (\"data\", \"payload\", \"incident\"):\n                    nested = value.get(key)\n                    if isinstance(nested, (dict, str)) and nested:\n                        value = nested\n                        break\n                else:\n                    return value\n                continue\n            raise ValueError(\"Webhook payload must contain a JSON object\")\n        raise ValueError(\"Webhook payload has too many transport wrappers\")\n\n    def _route(self, output):\n        raw = self._dict(self.input_data)\n        declared = raw.get(\"event_type\")\n        has_issue = isinstance(raw.get(\"issue\"), dict) or bool(raw.get(\"issue_key\"))\n        has_incident = all(raw.get(key) for key in (\"route\", \"error_type\", \"message\"))\n        if has_issue and has_incident:\n            raise ValueError(\"Ambiguous event: Jira and incident data cannot share one event\")\n        if declared not in (None, \"incident\", \"jira.status_changed\", \"preview\"):\n            kind, reason = \"ignored\", \"unsupported_event_type\"\n        elif has_issue and declared in (None, \"jira.status_changed\"):\n            kind, reason = \"jira\", \"jira_status_event\"\n        elif has_incident and raw.get(\"level\", \"error\") == \"error\" and declared in (None, \"incident\"):\n            kind, reason = \"incident\", \"application_error\"\n        else:\n            kind, reason = \"ignored\", \"non_error_or_incomplete_event\"\n        for other in (\"incident\", \"jira\", \"ignored\"):\n            if other != kind:\n                self.stop(other)\n                # Match the installed native If-Else routing semantics.\n                if getattr(self, \"graph\", None):\n                    self.graph.exclude_branch_conditionally(self._id, output_name=other)\n        self.status = f\"Selected {kind}: {reason}\"\n        if output != kind:\n            return Data(data={})\n        return Data(data={**raw, \"event_type\": \"jira.status_changed\" if kind == \"jira\" else kind, \"route_reason\": reason})\n\n    def incident_event(self) -> Data:\n        return self._route(\"incident\")\n\n    def jira_event(self) -> Data:\n        return self._route(\"jira\")\n\n    def ignored_event(self) -> Data:\n        return self._route(\"ignored\")\n",
+                "type": "code"
+              },
+              "input_data": {
+                "_input_type": "HandleInput",
+                "name": "input_data",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "incident",
+                "display_name": "Application error",
+                "method": "incident_event",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "group_outputs": true,
+                "cache": true,
+                "value": "__UNDEFINED__"
+              },
+              {
+                "name": "jira",
+                "display_name": "Jira status event",
+                "method": "jira_event",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "group_outputs": true,
+                "cache": true,
+                "value": "__UNDEFINED__"
+              },
+              {
+                "name": "ignored",
+                "display_name": "Ignored event",
+                "method": "ignored_event",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "group_outputs": true,
+                "cache": true,
+                "value": "__UNDEFINED__"
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Normalize-incident",
+        "type": "genericNode",
+        "position": {
+          "x": 820,
+          "y": 0
+        },
+        "data": {
+          "id": "Normalize-incident",
+          "type": "CustomComponent",
+          "node": {
+            "name": "NormalizeIncident",
+            "display_name": "Normalize Error",
+            "description": "Validate the error contract and preserve request correlation and stack evidence.",
+            "icon": "braces",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import json\nfrom datetime import datetime\nfrom typing import Any\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\nclass NormalizeIncident(Component):\n    display_name = \"Normalize Incident\"\n    description = \"Converts the PM2-Log-Viewer event into the standard incident contract.\"\n    icon = \"braces\"\n    name = \"NormalizeIncident\"\n\n    inputs = [HandleInput(name=\"input_data\", display_name=\"Incident Event\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False)]\n    outputs = [Output(display_name=\"Normalized Incident\", name=\"result\", method=\"process\")]\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        # Webhook/Message adapters can wrap JSON strings and materialize the\n        # escaped newlines inside stack traces. Never discard Message.text\n        # just because its data attribute is empty.\n        for _ in range(12):\n            if not isinstance(value, (dict, str)):\n                data = getattr(value, \"data\", None)\n                value = data if data else getattr(value, \"text\", None) or getattr(value, \"default_value\", None)\n            if isinstance(value, str):\n                text = value.strip()\n                start, end = text.find(\"{\"), text.rfind(\"}\")\n                candidates = [text]\n                if start >= 0 and end > start:\n                    candidates.append(text[start:end + 1])\n                for candidate in candidates:\n                    try:\n                        value = json.loads(candidate, strict=False)\n                        break\n                    except (ValueError, TypeError):\n                        continue\n                else:\n                    raise ValueError(\"Webhook payload must contain a JSON object\")\n                continue\n            if isinstance(value, dict):\n                for key in (\"data\", \"payload\", \"incident\"):\n                    nested = value.get(key)\n                    if isinstance(nested, (dict, str)) and nested:\n                        value = nested\n                        break\n                else:\n                    return value\n                continue\n            raise ValueError(\"Webhook payload must contain a JSON object\")\n        raise ValueError(\"Webhook payload has too many transport wrappers\")\n\n    def process(self) -> Data:\n        raw = self._dict(self.input_data)\n        missing = [key for key in (\"route\", \"error_type\", \"message\") if not isinstance(raw.get(key), str) or not raw[key].strip()]\n        if missing:\n            raise ValueError(\"Incident is missing required fields: \" + \", \".join(missing))\n        incident = {\n            \"source\": raw.get(\"source\") or raw.get(\"source_app\") or \"pm2-log-viewer\",\n            \"service\": raw.get(\"service\") or \"button-demo\",\n            \"environment\": raw.get(\"environment\") or \"local\",\n            \"route\": raw.get(\"route\") or \"unknown\",\n            \"error_type\": raw.get(\"error_type\") or raw.get(\"name\") or \"UnknownError\",\n            \"message\": raw.get(\"message\") or \"No error message provided\",\n            \"stack_trace\": raw.get(\"stack_trace\") or raw.get(\"stack\") or \"\",\n            \"request_id\": raw.get(\"request_id\") or raw.get(\"requestId\") or \"req-unknown\",\n            \"timestamp\": raw.get(\"timestamp\") or datetime.utcnow().isoformat(),\n            \"log_reference\": raw.get(\"log_reference\") or \"pm2-log-viewer\",\n            \"event_id\": raw.get(\"event_id\") or \"\",\n        }\n        if raw.get(\"fingerprint\"):\n            incident[\"fingerprint\"] = raw[\"fingerprint\"]\n        self.status = f\"{incident['error_type']} on {incident['route']}; request {incident['request_id']}\"\n        return Data(data=incident)\n",
+                "type": "code"
+              },
+              "input_data": {
+                "_input_type": "HandleInput",
+                "name": "input_data",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Fingerprint-incident",
+        "type": "genericNode",
+        "position": {
+          "x": 1180,
+          "y": 0
+        },
+        "data": {
+          "id": "Fingerprint-incident",
+          "type": "CustomComponent",
+          "node": {
+            "name": "FingerprintIncident",
+            "display_name": "Correlate Incident",
+            "description": "Deterministic fingerprint links recurring failures to their active Jira incident.",
+            "icon": "fingerprint",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import hashlib\nimport json\nfrom typing import Any\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\nclass FingerprintIncident(Component):\n    display_name = \"Fingerprint Incident\"\n    description = \"Creates a deterministic fingerprint and Jira deduplication label.\"\n    icon = \"fingerprint\"\n    name = \"FingerprintIncident\"\n\n    inputs = [HandleInput(name=\"incident\", display_name=\"Normalized Incident\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False)]\n    outputs = [Output(display_name=\"Fingerprinted Incident\", name=\"result\", method=\"process\")]\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        if hasattr(value, \"data\"):\n            value = getattr(value, \"data\", None)\n        if isinstance(value, dict):\n            return value\n        if isinstance(value, str):\n            try:\n                return json.loads(value)\n            except Exception:\n                return {}\n        return {}\n\n    def process(self) -> Data:\n        incident = self._dict(self.incident)\n        key = \"|\".join([\n            str(incident.get(\"service\") or \"button-demo\").strip().lower(),\n            str(incident.get(\"route\") or \"unknown\").strip(),\n            str(incident.get(\"error_type\") or \"Error\").strip(),\n            str(incident.get(\"message\") or \"unknown\").strip(),\n        ])\n        fingerprint = str(incident.get(\"fingerprint\") or hashlib.sha256(key.encode(\"utf-8\")).hexdigest())\n        incident[\"fingerprint\"] = fingerprint\n        incident[\"fingerprint_prefix\"] = fingerprint[:8]\n        incident[\"dedup_label\"] = f\"incident-{fingerprint[:8]}\"\n        self.status = f\"Correlated as {incident['dedup_label']}\"\n        return Data(data=incident)\n",
+                "type": "code"
+              },
+              "incident": {
+                "_input_type": "HandleInput",
+                "name": "incident",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "JiraTicket-incident",
+        "type": "genericNode",
+        "position": {
+          "x": 1540,
+          "y": 0
+        },
+        "data": {
+          "id": "JiraTicket-incident",
+          "type": "CustomComponent",
+          "node": {
+            "name": "JiraTicketWriter",
+            "display_name": "Create or Update Jira",
+            "description": "Create a new incident or update an active ticket. Completed incidents start a new lifecycle.",
+            "icon": "jira",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import base64\nimport json\nimport os\nimport re\nimport urllib.error\nimport urllib.request\nfrom typing import Any, Optional\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\nclass JiraTicketWriter(Component):\n    display_name = \"Create or Update Jira Ticket\"\n    description = \"Searches by incident label, then creates or updates the configured Jira issue type.\"\n    icon = \"jira\"\n    name = \"JiraTicketWriter\"\n\n    inputs = [HandleInput(name=\"incident\", display_name=\"Fingerprinted Incident\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False)]\n    outputs = [Output(display_name=\"Jira Result\", name=\"result\", method=\"process\")]\n\n    def _call(self, endpoint: str, method: str = \"GET\", body: Optional[dict] = None) -> Any:\n        base = os.environ.get(\"JIRA_BASE_URL\", \"\").rstrip(\"/\")\n        email = os.environ.get(\"JIRA_EMAIL\", \"\").strip()\n        token = os.environ.get(\"JIRA_API_TOKEN\", \"\").strip()\n        if not base or not email or not token:\n            raise ValueError(\"Jira credentials are not configured\")\n        raw = base64.b64encode(f\"{email}:{token}\".encode()).decode()\n        payload = json.dumps(body).encode() if body is not None else None\n        request = urllib.request.Request(\n            f\"{base}{endpoint}\",\n            data=payload,\n            headers={\"Authorization\": f\"Basic {raw}\", \"Accept\": \"application/json\", \"Content-Type\": \"application/json\"},\n            method=method,\n        )\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors=\"replace\") if error.fp else \"\"\n            raise RuntimeError(f\"Jira API error ({error.code}): {detail[:500]}\") from error\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        if hasattr(value, \"data\"):\n            value = getattr(value, \"data\", None)\n        if isinstance(value, dict):\n            return value\n        if isinstance(value, str):\n            try:\n                return json.loads(value)\n            except Exception:\n                return {}\n        return {}\n\n    @staticmethod\n    def _text(value: Any) -> str:\n        if isinstance(value, dict):\n            return str(value.get(\"text\") or \"\") + \" \" + \" \".join(JiraTicketWriter._text(item) for item in value.get(\"content\", []))\n        return \"\"\n\n    @staticmethod\n    def _description(incident: dict, count: int) -> dict:\n        lines = [\n            f\"Service: {incident.get('service')}\",\n            f\"Incident Source: {incident.get('source')}\",\n            f\"Environment: {incident.get('environment')}\",\n            f\"Endpoint: {incident.get('route')}\",\n            f\"Timestamp: {incident.get('timestamp')}\",\n            f\"Request ID: {incident.get('request_id')}\",\n            f\"Log Reference: {incident.get('log_reference')}\",\n            f\"Occurrence Count: {count}\",\n            f\"Error Fingerprint: {incident.get('fingerprint')}\",\n        ]\n        content = [\n            {\"type\": \"heading\", \"attrs\": {\"level\": 2}, \"content\": [{\"type\": \"text\", \"text\": \"What Failed\"}]},\n            {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": f\"{incident.get('error_type')}: {incident.get('message')}\"}]},\n            {\"type\": \"heading\", \"attrs\": {\"level\": 2}, \"content\": [{\"type\": \"text\", \"text\": \"Incident Telemetry & Details\"}]},\n            {\"type\": \"bulletList\", \"content\": [{\"type\": \"listItem\", \"content\": [{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": line}]}]} for line in lines]},\n            {\"type\": \"heading\", \"attrs\": {\"level\": 2}, \"content\": [{\"type\": \"text\", \"text\": \"Stack Trace\"}]},\n            {\"type\": \"codeBlock\", \"attrs\": {\"language\": \"text\"}, \"content\": [{\"type\": \"text\", \"text\": incident.get(\"stack_trace\") or \"No stack trace provided\"}]},\n            {\"type\": \"heading\", \"attrs\": {\"level\": 2}, \"content\": [{\"type\": \"text\", \"text\": \"Likely Cause (Inference)\"}]},\n            {\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": f\"[Inference / Likely Cause]: Inspect route '{incident.get('route')}' for the reported {incident.get('error_type')}. Developer confirmation is required.\"}]},\n        ]\n        return {\"type\": \"doc\", \"version\": 1, \"content\": content}\n\n    def process(self) -> Data:\n        incident = self._dict(self.incident)\n        for field in (\"route\", \"error_type\", \"message\", \"fingerprint\"):\n            if not incident.get(field):\n                raise ValueError(f\"Incident is missing {field}; refusing to create an empty ticket\")\n        project = os.environ.get(\"JIRA_PROJECT_KEY\", \"DEMO\").strip()\n        summary = f\"{incident.get('service')} ({incident.get('environment')}): {incident.get('error_type')} on {incident.get('route')}\"[:255]\n        label = str(incident.get(\"dedup_label\") or f\"incident-{str(incident.get('fingerprint', ''))[:8]}\")\n        result = dict(incident)\n        result[\"jira_label\"] = label\n        # A recurrence after completion is a new incident lifecycle. Use the\n        # status category, since legacy completed issues may lack Resolution.\n        search = self._call(\"/rest/api/3/search/jql\", \"POST\", {\"jql\": f'project = \"{project}\" AND labels = \"{label}\" AND statusCategory != Done ORDER BY created DESC', \"maxResults\": 1, \"fields\": [\"description\", \"summary\"]})\n        existing = (search.get(\"issues\") or [None])[0]\n        if existing:\n            key = existing.get(\"key\")\n            evidence = self._text((existing.get(\"fields\") or {}).get(\"description\"))\n            previous = re.search(r\"Occurrence Count: (\\d+)\", evidence)\n            count = int(previous.group(1)) if previous else 1\n            if f\"Request ID: {incident.get('request_id')} \" in evidence:\n                return Data(data={**result, \"status\": \"unchanged\", \"action\": \"already_processed\", \"issue_key\": key, \"occurrence_count\": count})\n            count += 1\n            comment = {\"body\": {\"type\": \"doc\", \"version\": 1, \"content\": [{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": f\"Duplicate incident occurrence #{count}; request {incident.get('request_id')}.\"}]}]}}\n            self._call(f\"/rest/api/3/issue/{key}/comment\", \"POST\", comment)\n            self._call(f\"/rest/api/3/issue/{key}\", \"PUT\", {\"fields\": {\"summary\": summary, \"description\": self._description(incident, count)}})\n            result.update({\"status\": \"updated\", \"action\": \"duplicate_updated\", \"issue_key\": key, \"occurrence_count\": count})\n        else:\n            issue_type = os.environ.get(\"JIRA_ISSUE_TYPE\", \"Bug\").strip()\n            created = self._call(\"/rest/api/3/issue\", \"POST\", {\"fields\": {\"project\": {\"key\": project}, \"issuetype\": {\"name\": issue_type}, \"summary\": summary, \"description\": self._description(incident, 1), \"labels\": [\"automated-incident\", \"prototype\", label]}})\n            result.update({\"status\": \"created\", \"action\": \"ticket_created\", \"issue_key\": created.get(\"key\"), \"occurrence_count\": 1})\n        self.status = f\"{result['action']}: {result['issue_key']} (occurrence {result['occurrence_count']})\"\n        return Data(data=result)\n",
+                "type": "code"
+              },
+              "incident": {
+                "_input_type": "HandleInput",
+                "name": "incident",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Handoff-incident",
+        "type": "genericNode",
+        "position": {
+          "x": 1900,
+          "y": 0
+        },
+        "data": {
+          "id": "Handoff-incident",
+          "type": "CustomComponent",
+          "node": {
+            "name": "AwaitDeveloper",
+            "display_name": "Developer Handoff",
+            "description": "End this event with the ticket and required fix branch. Resume here when Jira is resolved.",
+            "icon": "user-check",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "\"\"\"Shared HTTP and payload helpers embedded into lifecycle graph components.\n\nThe flow builder inlines this mixin, so imported flows have no local-file\nruntime dependency. Credentials are always read inside the LangFlow server.\n\"\"\"\nimport base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any\n\n\nclass LifecycleAPI:\n    @staticmethod\n    def _data(value: Any) -> dict:\n        if hasattr(value, 'data'):\n            value = value.data\n        if not isinstance(value, dict):\n            raise ValueError('This stage requires structured lifecycle data')\n        return dict(value)\n\n    def _request(self, service: str, endpoint: str, method: str = 'GET', body=None):\n        if service == 'GitHub':\n            token = os.environ.get('GITHUB_TOKEN', '').strip()\n            if not token:\n                raise ValueError('GITHUB_TOKEN is not configured')\n            base = 'https://api.github.com'\n            headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}\n        else:\n            base = os.environ.get('JIRA_BASE_URL', '').rstrip('/')\n            email = os.environ.get('JIRA_EMAIL', '').strip()\n            token = os.environ.get('JIRA_API_TOKEN', '').strip()\n            if not base or not email or not token:\n                raise ValueError('Jira credentials are not configured')\n            auth = base64.b64encode(f'{email}:{token}'.encode()).decode()\n            headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}\n        headers['Content-Type'] = 'application/json'\n        request = urllib.request.Request(base + endpoint, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors='replace') if error.fp else ''\n            failure = RuntimeError(f'{service} API error ({error.code}): {detail[:300]}')\n            failure.status_code = error.code\n            raise failure from error\n\n    def _github(self, endpoint, method='GET', body=None):\n        return self._request('GitHub', endpoint, method, body)\n\n    def _jira(self, endpoint, method='GET', body=None):\n        return self._request('Jira', endpoint, method, body)\n\n    @staticmethod\n    def _issue_path(key):\n        return '/rest/api/3/issue/' + urllib.parse.quote(key, safe='')\n\n    @staticmethod\n    def _repo_path(context):\n        return '/repos/' + urllib.parse.quote(context['owner'], safe='') + '/' + urllib.parse.quote(context['repository'], safe='')\n\n    def _comment_once(self, key, text, marker=None):\n        \"\"\"Look through paginated comments so event retries do not spam Jira.\"\"\"\n        start = 0\n        while True:\n            page = self._jira(f'{self._issue_path(key)}/comment?startAt={start}&maxResults=100')\n            comments = page.get('comments') or []\n            if (marker or text) in json.dumps([comment.get('body') for comment in comments]):\n                return\n            start += len(comments)\n            if not comments or start >= page.get('total', start):\n                break\n        self._jira(f'{self._issue_path(key)}/comment', 'POST', {'body': {'type': 'doc', 'version': 1, 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': text}]}]}})\n\n\nimport os\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output, StrInput\nfrom langflow.schema import Data\n\n\n\nclass AwaitDeveloper(LifecycleAPI, Component):\n    display_name = 'Developer Handoff'\n    description = 'Records the ticket handoff. The next Jira event resumes this lifecycle in the same flow.'\n    icon = 'user-check'\n    name = 'AwaitDeveloper'\n    inputs = [\n        HandleInput(name='ticket', display_name='Jira Ticket', input_types=['Data'], required=True),\n        StrInput(name='branch_prefix', display_name='Branch Prefix', value='fix/'),\n        StrInput(name='trigger_status', display_name='Resolved Status', value='Done'),\n    ]\n    outputs = [Output(display_name='Handoff Recorded', name='result', method='process')]\n\n    def process(self) -> Data:\n        ticket = self._data(self.ticket)\n        key = ticket.get('issue_key')\n        if not key:\n            raise ValueError('Jira did not return an issue key')\n        branch = f'{self.branch_prefix}{key}'\n        self.status = f'{key} ready. Push {branch}, then resolve to {self.trigger_status}.'\n        return Data(data={**ticket, 'lifecycle_stage': 'awaiting_developer', 'expected_branch': branch,\n                          'resume_status': self.trigger_status, 'issue_url': os.environ.get('JIRA_BASE_URL', '').rstrip('/') + '/browse/' + key})\n",
+                "type": "code"
+              },
+              "ticket": {
+                "_input_type": "HandleInput",
+                "name": "ticket",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              },
+              "trigger_status": {
+                "_input_type": "StrInput",
+                "name": "trigger_status",
+                "display_name": "trigger status",
+                "type": "str",
+                "value": "Completed",
+                "input_types": [],
+                "required": false,
+                "show": true,
+                "advanced": true,
+                "api_editable": false
+              },
+              "branch_prefix": {
+                "_input_type": "StrInput",
+                "name": "branch_prefix",
+                "display_name": "branch prefix",
+                "type": "str",
+                "value": "fix/",
+                "input_types": [],
+                "required": false,
+                "show": true,
+                "advanced": true,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Parse-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 820,
+          "y": 440
+        },
+        "data": {
+          "id": "Parse-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "ParseJiraEvent",
+            "display_name": "Read Jira Update",
+            "description": "Extract the issue key, summary, and status from the watcher or Jira webhook.",
+            "icon": "file-json",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import json\nfrom typing import Any\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\nclass ParseJiraEvent(Component):\n    display_name = \"Parse Jira Event\"\n    description = \"Extracts the Jira issue and status from a webhook payload.\"\n    icon = \"file-json\"\n    name = \"ParseJiraEvent\"\n\n    inputs = [HandleInput(name=\"input_data\", display_name=\"Jira Webhook Event\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False)]\n    outputs = [Output(display_name=\"Parsed Jira Event\", name=\"result\", method=\"process\")]\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        # Webhook/Message adapters can wrap JSON strings and materialize the\n        # escaped newlines inside stack traces. Never discard Message.text\n        # just because its data attribute is empty.\n        for _ in range(12):\n            if not isinstance(value, (dict, str)):\n                data = getattr(value, \"data\", None)\n                value = data if data else getattr(value, \"text\", None) or getattr(value, \"default_value\", None)\n            if isinstance(value, str):\n                text = value.strip()\n                start, end = text.find(\"{\"), text.rfind(\"}\")\n                candidates = [text]\n                if start >= 0 and end > start:\n                    candidates.append(text[start:end + 1])\n                for candidate in candidates:\n                    try:\n                        value = json.loads(candidate, strict=False)\n                        break\n                    except (ValueError, TypeError):\n                        continue\n                else:\n                    raise ValueError(\"Webhook payload must contain a JSON object\")\n                continue\n            if isinstance(value, dict):\n                for key in (\"data\", \"payload\", \"incident\"):\n                    nested = value.get(key)\n                    if isinstance(nested, (dict, str)) and nested:\n                        value = nested\n                        break\n                else:\n                    return value\n                continue\n            raise ValueError(\"Webhook payload must contain a JSON object\")\n        raise ValueError(\"Webhook payload has too many transport wrappers\")\n\n    def process(self) -> Data:\n        payload = self._dict(self.input_data)\n        issue = payload.get(\"issue\") if isinstance(payload.get(\"issue\"), dict) else payload\n        fields = issue.get(\"fields\") if isinstance(issue.get(\"fields\"), dict) else {}\n        status = fields.get(\"status\") if isinstance(fields.get(\"status\"), dict) else {}\n        result = dict(payload)\n        result[\"issue\"] = issue\n        result[\"issue_key\"] = str(issue.get(\"key\") or payload.get(\"issue_key\") or \"\").strip()\n        result[\"status_name\"] = str(status.get(\"name\") or payload.get(\"status\") or payload.get(\"status_name\") or \"\").strip()\n        result[\"summary\"] = str(fields.get(\"summary\") or f\"Fix {result['issue_key']}\").strip()\n        return Data(data=result)\n",
+                "type": "code"
+              },
+              "input_data": {
+                "_input_type": "HandleInput",
+                "name": "input_data",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Validate-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 1180,
+          "y": 440
+        },
+        "data": {
+          "id": "Validate-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "ValidateJiraDone",
+            "display_name": "Check Resolution",
+            "description": "Only Completed tickets are eligible to open a pull request.",
+            "icon": "circle-check",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import json\nimport os\nfrom typing import Any\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output, StrInput\nfrom langflow.schema import Data\n\n\nclass ValidateJiraDone(Component):\n    display_name = \"Check Jira Status\"\n    description = \"Allows the PR branch only when the Jira issue is Done.\"\n    icon = \"circle-check\"\n    name = \"ValidateJiraDone\"\n\n    inputs = [\n        HandleInput(name=\"event\", display_name=\"Parsed Jira Event\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False),\n        StrInput(name=\"trigger_status\", display_name=\"PR Trigger Status\", value=\"Done\"),\n    ]\n    outputs = [Output(display_name=\"Validated Event\", name=\"result\", method=\"process\")]\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        if hasattr(value, \"data\"):\n            value = getattr(value, \"data\", None)\n        if isinstance(value, dict):\n            return value\n        if isinstance(value, str):\n            try:\n                return json.loads(value)\n            except Exception:\n                return {}\n        return {}\n\n    def process(self) -> Data:\n        event = self._dict(self.event)\n        expected = str(self.trigger_status or os.environ.get(\"JIRA_PR_TRIGGER_STATUS\", \"Done\")).strip()\n        event[\"trigger_status\"] = expected\n        event[\"eligible\"] = bool(event.get(\"issue_key\")) and str(event.get(\"status_name\", \"\")).casefold() == expected.casefold()\n        event[\"validation\"] = \"passed\" if event[\"eligible\"] else \"ignored\"\n        self.status = f\"{event.get('issue_key')}: {event.get('status_name')} — {event['validation']}\"\n        return Data(data=event)\n",
+                "type": "code"
+              },
+              "event": {
+                "_input_type": "HandleInput",
+                "name": "event",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              },
+              "trigger_status": {
+                "_input_type": "StrInput",
+                "name": "trigger_status",
+                "display_name": "trigger status",
+                "type": "str",
+                "value": "Completed",
+                "input_types": [],
+                "required": false,
+                "show": true,
+                "advanced": true,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Prepare-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 1540,
+          "y": 440
+        },
+        "data": {
+          "id": "Prepare-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "PreparePRContext",
+            "display_name": "Prepare Fix Context",
+            "description": "Use the configured repository, base branch, and ticket-specific developer branch.",
+            "icon": "git-branch",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "import json\nimport os\nfrom typing import Any\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output, StrInput\nfrom langflow.schema import Data\n\n\nclass PreparePRContext(Component):\n    display_name = \"Prepare PR Context\"\n    description = \"Builds the fixed repository and fix/<JIRA-KEY> branch context.\"\n    icon = \"git-pull-request\"\n    name = \"PreparePRContext\"\n\n    inputs = [\n        HandleInput(name=\"event\", display_name=\"Validated Jira Event\", input_types=[\"Data\", \"JSON\", \"Message\"], required=False),\n        StrInput(name=\"branch_prefix\", display_name=\"Fix Branch Prefix\", value=\"fix/\"),\n    ]\n    outputs = [Output(display_name=\"PR Context\", name=\"result\", method=\"process\")]\n\n    @staticmethod\n    def _dict(value: Any) -> dict:\n        if hasattr(value, \"data\"):\n            value = getattr(value, \"data\", None)\n        if isinstance(value, dict):\n            return value\n        if isinstance(value, str):\n            try:\n                return json.loads(value)\n            except Exception:\n                return {}\n        return {}\n\n    def process(self) -> Data:\n        event = self._dict(self.event)\n        key = str(event.get(\"issue_key\") or \"\").strip()\n        event.update({\n            \"owner\": os.environ.get(\"GITHUB_OWNER\", \"anuraag-bagepalli\").strip(),\n            \"repository\": os.environ.get(\"GITHUB_REPOSITORY\", \"incident-demo-app\").strip(),\n            \"base_branch\": os.environ.get(\"GITHUB_BASE_BRANCH\", \"main\").strip() or \"main\",\n            \"branch\": f\"{self.branch_prefix or 'fix/'}{key}\" if key else \"\",\n        })\n        self.status = f\"{event['owner']}/{event['repository']}: {event['branch']} → {event['base_branch']}\"\n        return Data(data=event)\n",
+                "type": "code"
+              },
+              "event": {
+                "_input_type": "HandleInput",
+                "name": "event",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              },
+              "branch_prefix": {
+                "_input_type": "StrInput",
+                "name": "branch_prefix",
+                "display_name": "branch prefix",
+                "type": "str",
+                "value": "fix/",
+                "input_types": [],
+                "required": false,
+                "show": true,
+                "advanced": true,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Verify-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 1900,
+          "y": 440
+        },
+        "data": {
+          "id": "Verify-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "VerifyFixBranch",
+            "display_name": "Verify Pushed Fix",
+            "description": "Recheck the live Jira status, branch existence, and commits ahead of main.",
+            "icon": "shield-check",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "\"\"\"Shared HTTP and payload helpers embedded into lifecycle graph components.\n\nThe flow builder inlines this mixin, so imported flows have no local-file\nruntime dependency. Credentials are always read inside the LangFlow server.\n\"\"\"\nimport base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any\n\n\nclass LifecycleAPI:\n    @staticmethod\n    def _data(value: Any) -> dict:\n        if hasattr(value, 'data'):\n            value = value.data\n        if not isinstance(value, dict):\n            raise ValueError('This stage requires structured lifecycle data')\n        return dict(value)\n\n    def _request(self, service: str, endpoint: str, method: str = 'GET', body=None):\n        if service == 'GitHub':\n            token = os.environ.get('GITHUB_TOKEN', '').strip()\n            if not token:\n                raise ValueError('GITHUB_TOKEN is not configured')\n            base = 'https://api.github.com'\n            headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}\n        else:\n            base = os.environ.get('JIRA_BASE_URL', '').rstrip('/')\n            email = os.environ.get('JIRA_EMAIL', '').strip()\n            token = os.environ.get('JIRA_API_TOKEN', '').strip()\n            if not base or not email or not token:\n                raise ValueError('Jira credentials are not configured')\n            auth = base64.b64encode(f'{email}:{token}'.encode()).decode()\n            headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}\n        headers['Content-Type'] = 'application/json'\n        request = urllib.request.Request(base + endpoint, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors='replace') if error.fp else ''\n            failure = RuntimeError(f'{service} API error ({error.code}): {detail[:300]}')\n            failure.status_code = error.code\n            raise failure from error\n\n    def _github(self, endpoint, method='GET', body=None):\n        return self._request('GitHub', endpoint, method, body)\n\n    def _jira(self, endpoint, method='GET', body=None):\n        return self._request('Jira', endpoint, method, body)\n\n    @staticmethod\n    def _issue_path(key):\n        return '/rest/api/3/issue/' + urllib.parse.quote(key, safe='')\n\n    @staticmethod\n    def _repo_path(context):\n        return '/repos/' + urllib.parse.quote(context['owner'], safe='') + '/' + urllib.parse.quote(context['repository'], safe='')\n\n    def _comment_once(self, key, text, marker=None):\n        \"\"\"Look through paginated comments so event retries do not spam Jira.\"\"\"\n        start = 0\n        while True:\n            page = self._jira(f'{self._issue_path(key)}/comment?startAt={start}&maxResults=100')\n            comments = page.get('comments') or []\n            if (marker or text) in json.dumps([comment.get('body') for comment in comments]):\n                return\n            start += len(comments)\n            if not comments or start >= page.get('total', start):\n                break\n        self._jira(f'{self._issue_path(key)}/comment', 'POST', {'body': {'type': 'doc', 'version': 1, 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': text}]}]}})\n\n\nimport os\nimport re\nimport urllib.parse\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\n\nclass VerifyFixBranch(LifecycleAPI, Component):\n    display_name = 'Verify Fix Branch'\n    description = 'Rechecks Jira status, repository branch, and commits ahead of the base branch.'\n    icon = 'git-branch'\n    name = 'VerifyFixBranch'\n    inputs = [HandleInput(name='context', display_name='Fix Context', input_types=['Data'], required=True)]\n    outputs = [Output(display_name='Verified Branch', name='result', method='process')]\n\n    def process(self) -> Data:\n        context = self._data(self.context)\n        if not context.get('eligible'):\n            self.status = 'Skipped: Jira is not in the configured resolved status.'\n            return Data(data={**context, 'status': 'ignored', 'reason': 'status_not_resolved'})\n        key = str(context.get('issue_key') or '')\n        project = os.environ.get('JIRA_PROJECT_KEY', 'DEMO').strip()\n        if not re.fullmatch(re.escape(project) + r'-\\d+', key):\n            raise ValueError('Issue does not belong to the configured Jira project')\n        live = self._jira(f'{self._issue_path(key)}?fields=status,labels')\n        fields = live.get('fields') or {}\n        status = (fields.get('status') or {}).get('name', '')\n        if status.casefold() != str(context.get('trigger_status') or 'Done').casefold():\n            self.status = f'Ignored stale event: live Jira status is {status}.'\n            return Data(data={**context, 'status': 'ignored', 'reason': 'jira_status_changed', 'eligible': False, 'jira_status': status})\n        if 'automated-incident' not in (fields.get('labels') or []):\n            raise ValueError('Only automated incident tickets may create a PR')\n        repo = self._repo_path(context)\n        branch = context['branch']\n        try:\n            self._github(f'{repo}/branches/{urllib.parse.quote(branch, safe=\"\")}')\n        except RuntimeError as error:\n            if getattr(error, 'status_code', None) != 404:\n                raise\n            text = f'Branch {branch} is not available in {context[\"owner\"]}/{context[\"repository\"]}. Push the fix branch before resolving {key}.'\n            self._comment_once(key, text)\n            self.status = text\n            return Data(data={**context, 'status': 'blocked', 'reason': 'missing_branch', 'branch_verified': False, 'jira_status': status})\n        comparison = self._github(f'{repo}/compare/{urllib.parse.quote(context[\"base_branch\"], safe=\"\")}...{urllib.parse.quote(branch, safe=\"\")}')\n        if comparison.get('ahead_by', 0) < 1:\n            text = f'Branch {branch} has no commits ahead of {context[\"base_branch\"]}. Commit and push the actual fix to open a PR.'\n            self._comment_once(key, text)\n            self.status = text\n            return Data(data={**context, 'status': 'blocked', 'reason': 'no_commits', 'branch_verified': False, 'jira_status': status})\n        self.status = f'{branch} verified: {comparison[\"ahead_by\"]} commit(s) ahead.'\n        return Data(data={**context, 'branch_verified': True, 'jira_status': status, 'commits_ahead': comparison['ahead_by']})\n",
+                "type": "code"
+              },
+              "context": {
+                "_input_type": "HandleInput",
+                "name": "context",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "OpenPR-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 1900,
+          "y": 800
+        },
+        "data": {
+          "id": "OpenPR-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "OpenPullRequest",
+            "display_name": "Open or Reuse PR",
+            "description": "Create exactly one matching open pull request for the pushed developer branch.",
+            "icon": "github",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "\"\"\"Shared HTTP and payload helpers embedded into lifecycle graph components.\n\nThe flow builder inlines this mixin, so imported flows have no local-file\nruntime dependency. Credentials are always read inside the LangFlow server.\n\"\"\"\nimport base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any\n\n\nclass LifecycleAPI:\n    @staticmethod\n    def _data(value: Any) -> dict:\n        if hasattr(value, 'data'):\n            value = value.data\n        if not isinstance(value, dict):\n            raise ValueError('This stage requires structured lifecycle data')\n        return dict(value)\n\n    def _request(self, service: str, endpoint: str, method: str = 'GET', body=None):\n        if service == 'GitHub':\n            token = os.environ.get('GITHUB_TOKEN', '').strip()\n            if not token:\n                raise ValueError('GITHUB_TOKEN is not configured')\n            base = 'https://api.github.com'\n            headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}\n        else:\n            base = os.environ.get('JIRA_BASE_URL', '').rstrip('/')\n            email = os.environ.get('JIRA_EMAIL', '').strip()\n            token = os.environ.get('JIRA_API_TOKEN', '').strip()\n            if not base or not email or not token:\n                raise ValueError('Jira credentials are not configured')\n            auth = base64.b64encode(f'{email}:{token}'.encode()).decode()\n            headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}\n        headers['Content-Type'] = 'application/json'\n        request = urllib.request.Request(base + endpoint, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors='replace') if error.fp else ''\n            failure = RuntimeError(f'{service} API error ({error.code}): {detail[:300]}')\n            failure.status_code = error.code\n            raise failure from error\n\n    def _github(self, endpoint, method='GET', body=None):\n        return self._request('GitHub', endpoint, method, body)\n\n    def _jira(self, endpoint, method='GET', body=None):\n        return self._request('Jira', endpoint, method, body)\n\n    @staticmethod\n    def _issue_path(key):\n        return '/rest/api/3/issue/' + urllib.parse.quote(key, safe='')\n\n    @staticmethod\n    def _repo_path(context):\n        return '/repos/' + urllib.parse.quote(context['owner'], safe='') + '/' + urllib.parse.quote(context['repository'], safe='')\n\n    def _comment_once(self, key, text, marker=None):\n        \"\"\"Look through paginated comments so event retries do not spam Jira.\"\"\"\n        start = 0\n        while True:\n            page = self._jira(f'{self._issue_path(key)}/comment?startAt={start}&maxResults=100')\n            comments = page.get('comments') or []\n            if (marker or text) in json.dumps([comment.get('body') for comment in comments]):\n                return\n            start += len(comments)\n            if not comments or start >= page.get('total', start):\n                break\n        self._jira(f'{self._issue_path(key)}/comment', 'POST', {'body': {'type': 'doc', 'version': 1, 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': text}]}]}})\n\n\nimport urllib.parse\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\n\nclass OpenPullRequest(LifecycleAPI, Component):\n    display_name = 'Open or Reuse Pull Request'\n    description = 'Creates a PR from the developer branch into main, or reuses the matching open PR.'\n    icon = 'git-pull-request'\n    name = 'OpenPullRequest'\n    inputs = [HandleInput(name='context', display_name='Verified Fix', input_types=['Data'], required=True)]\n    outputs = [Output(display_name='Pull Request', name='result', method='process')]\n\n    def process(self) -> Data:\n        context = self._data(self.context)\n        if not context.get('eligible') or not context.get('branch_verified'):\n            self.status = 'No PR action: ' + str(context.get('reason') or 'branch_not_verified')\n            return Data(data=context)\n        repo = self._repo_path(context)\n        query = urllib.parse.urlencode({'state': 'open', 'head': f'{context[\"owner\"]}:{context[\"branch\"]}', 'base': context['base_branch'], 'per_page': '10'})\n        existing = self._github(f'{repo}/pulls?{query}')\n        if existing:\n            pr, action = existing[0], 'existing_pr'\n        else:\n            try:\n                pr = self._github(f'{repo}/pulls', 'POST', {'title': f'Fix {context[\"issue_key\"]}: {context.get(\"summary\") or context[\"issue_key\"]}'[:256],\n                    'head': context['branch'], 'base': context['base_branch'], 'body': f'Fixes {context[\"issue_key\"]}\\n\\nCreated from the developer\\'s pushed fix branch by the Incident Lifecycle flow.', 'draft': False})\n                action = 'created_pr'\n            except RuntimeError as error:\n                # A webhook and watcher may race. GitHub prevents duplicate PRs.\n                if getattr(error, 'status_code', None) != 422:\n                    raise\n                matches = self._github(f'{repo}/pulls?{query}')\n                if not matches:\n                    raise\n                pr, action = matches[0], 'existing_pr'\n        if not pr.get('html_url'):\n            raise ValueError('GitHub returned a PR without a URL')\n        self.status = f'{action}: {pr[\"html_url\"]}'\n        return Data(data={**context, 'status': 'pr_ready', 'action': action, 'pr_url': pr['html_url'], 'pr_number': pr.get('number')})\n",
+                "type": "code"
+              },
+              "context": {
+                "_input_type": "HandleInput",
+                "name": "context",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "LinkJira-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 1540,
+          "y": 800
+        },
+        "data": {
+          "id": "LinkJira-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "LinkPullRequestToJira",
+            "display_name": "Link PR to Jira",
+            "description": "Write the PR URL once and apply an optional supported Jira transition.",
+            "icon": "link",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "\"\"\"Shared HTTP and payload helpers embedded into lifecycle graph components.\n\nThe flow builder inlines this mixin, so imported flows have no local-file\nruntime dependency. Credentials are always read inside the LangFlow server.\n\"\"\"\nimport base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any\n\n\nclass LifecycleAPI:\n    @staticmethod\n    def _data(value: Any) -> dict:\n        if hasattr(value, 'data'):\n            value = value.data\n        if not isinstance(value, dict):\n            raise ValueError('This stage requires structured lifecycle data')\n        return dict(value)\n\n    def _request(self, service: str, endpoint: str, method: str = 'GET', body=None):\n        if service == 'GitHub':\n            token = os.environ.get('GITHUB_TOKEN', '').strip()\n            if not token:\n                raise ValueError('GITHUB_TOKEN is not configured')\n            base = 'https://api.github.com'\n            headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}\n        else:\n            base = os.environ.get('JIRA_BASE_URL', '').rstrip('/')\n            email = os.environ.get('JIRA_EMAIL', '').strip()\n            token = os.environ.get('JIRA_API_TOKEN', '').strip()\n            if not base or not email or not token:\n                raise ValueError('Jira credentials are not configured')\n            auth = base64.b64encode(f'{email}:{token}'.encode()).decode()\n            headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}\n        headers['Content-Type'] = 'application/json'\n        request = urllib.request.Request(base + endpoint, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors='replace') if error.fp else ''\n            failure = RuntimeError(f'{service} API error ({error.code}): {detail[:300]}')\n            failure.status_code = error.code\n            raise failure from error\n\n    def _github(self, endpoint, method='GET', body=None):\n        return self._request('GitHub', endpoint, method, body)\n\n    def _jira(self, endpoint, method='GET', body=None):\n        return self._request('Jira', endpoint, method, body)\n\n    @staticmethod\n    def _issue_path(key):\n        return '/rest/api/3/issue/' + urllib.parse.quote(key, safe='')\n\n    @staticmethod\n    def _repo_path(context):\n        return '/repos/' + urllib.parse.quote(context['owner'], safe='') + '/' + urllib.parse.quote(context['repository'], safe='')\n\n    def _comment_once(self, key, text, marker=None):\n        \"\"\"Look through paginated comments so event retries do not spam Jira.\"\"\"\n        start = 0\n        while True:\n            page = self._jira(f'{self._issue_path(key)}/comment?startAt={start}&maxResults=100')\n            comments = page.get('comments') or []\n            if (marker or text) in json.dumps([comment.get('body') for comment in comments]):\n                return\n            start += len(comments)\n            if not comments or start >= page.get('total', start):\n                break\n        self._jira(f'{self._issue_path(key)}/comment', 'POST', {'body': {'type': 'doc', 'version': 1, 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': text}]}]}})\n\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output, StrInput\nfrom langflow.schema import Data\n\n\n\nclass LinkPullRequestToJira(LifecycleAPI, Component):\n    display_name = 'Link PR to Jira'\n    description = 'Posts the PR URL once and applies an optional, available Jira transition.'\n    icon = 'link'\n    name = 'LinkPullRequestToJira'\n    inputs = [HandleInput(name='context', display_name='Pull Request Result', input_types=['Data'], required=True),\n              StrInput(name='raised_status', display_name='Optional Status After PR', value='')]\n    outputs = [Output(display_name='Lifecycle Result', name='result', method='process')]\n\n    def process(self) -> Data:\n        context = self._data(self.context)\n        if not context.get('pr_url'):\n            self.status = 'No Jira update: ' + str(context.get('reason') or 'no_pr')\n            return Data(data=context)\n        key, url = context['issue_key'], context['pr_url']\n        self._comment_once(key, f'GitHub PR ({context[\"action\"]}): {url}', marker=url)\n        live = self._jira(f'{self._issue_path(key)}?fields=status')\n        status = ((live.get('fields') or {}).get('status') or {}).get('name', '')\n        target = str(self.raised_status or '').strip()\n        result = {**context, 'status': 'success', 'jira_status': status, 'lifecycle_stage': 'pr_linked'}\n        if target and target.casefold() != status.casefold():\n            transitions = self._jira(f'{self._issue_path(key)}/transitions')\n            match = next((t for t in transitions.get('transitions', []) if str((t.get('to') or {}).get('name', '')).casefold() == target.casefold()), None)\n            if match:\n                self._jira(f'{self._issue_path(key)}/transitions', 'POST', {'transition': {'id': match['id']}})\n                result['jira_status'] = target\n            else:\n                result.update(status='partial', warning=f'PR linked; transition to {target} is unavailable')\n        self.status = f'{key} linked to {url}; Jira status: {result[\"jira_status\"]}.'\n        return Data(data=result)\n",
+                "type": "code"
+              },
+              "context": {
+                "_input_type": "HandleInput",
+                "name": "context",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              },
+              "raised_status": {
+                "_input_type": "StrInput",
+                "name": "raised_status",
+                "display_name": "raised status",
+                "type": "str",
+                "value": "",
+                "input_types": [],
+                "required": false,
+                "show": true,
+                "advanced": true,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Outcome-resolution",
+        "type": "genericNode",
+        "position": {
+          "x": 1180,
+          "y": 800
+        },
+        "data": {
+          "id": "Outcome-resolution",
+          "type": "CustomComponent",
+          "node": {
+            "name": "LifecycleOutcome",
+            "display_name": "Lifecycle Result",
+            "description": "Inspect the real outcome, Jira status, and PR URL for this execution.",
+            "icon": "flag",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "\"\"\"Shared HTTP and payload helpers embedded into lifecycle graph components.\n\nThe flow builder inlines this mixin, so imported flows have no local-file\nruntime dependency. Credentials are always read inside the LangFlow server.\n\"\"\"\nimport base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any\n\n\nclass LifecycleAPI:\n    @staticmethod\n    def _data(value: Any) -> dict:\n        if hasattr(value, 'data'):\n            value = value.data\n        if not isinstance(value, dict):\n            raise ValueError('This stage requires structured lifecycle data')\n        return dict(value)\n\n    def _request(self, service: str, endpoint: str, method: str = 'GET', body=None):\n        if service == 'GitHub':\n            token = os.environ.get('GITHUB_TOKEN', '').strip()\n            if not token:\n                raise ValueError('GITHUB_TOKEN is not configured')\n            base = 'https://api.github.com'\n            headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}\n        else:\n            base = os.environ.get('JIRA_BASE_URL', '').rstrip('/')\n            email = os.environ.get('JIRA_EMAIL', '').strip()\n            token = os.environ.get('JIRA_API_TOKEN', '').strip()\n            if not base or not email or not token:\n                raise ValueError('Jira credentials are not configured')\n            auth = base64.b64encode(f'{email}:{token}'.encode()).decode()\n            headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}\n        headers['Content-Type'] = 'application/json'\n        request = urllib.request.Request(base + endpoint, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors='replace') if error.fp else ''\n            failure = RuntimeError(f'{service} API error ({error.code}): {detail[:300]}')\n            failure.status_code = error.code\n            raise failure from error\n\n    def _github(self, endpoint, method='GET', body=None):\n        return self._request('GitHub', endpoint, method, body)\n\n    def _jira(self, endpoint, method='GET', body=None):\n        return self._request('Jira', endpoint, method, body)\n\n    @staticmethod\n    def _issue_path(key):\n        return '/rest/api/3/issue/' + urllib.parse.quote(key, safe='')\n\n    @staticmethod\n    def _repo_path(context):\n        return '/repos/' + urllib.parse.quote(context['owner'], safe='') + '/' + urllib.parse.quote(context['repository'], safe='')\n\n    def _comment_once(self, key, text, marker=None):\n        \"\"\"Look through paginated comments so event retries do not spam Jira.\"\"\"\n        start = 0\n        while True:\n            page = self._jira(f'{self._issue_path(key)}/comment?startAt={start}&maxResults=100')\n            comments = page.get('comments') or []\n            if (marker or text) in json.dumps([comment.get('body') for comment in comments]):\n                return\n            start += len(comments)\n            if not comments or start >= page.get('total', start):\n                break\n        self._jira(f'{self._issue_path(key)}/comment', 'POST', {'body': {'type': 'doc', 'version': 1, 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': text}]}]}})\n\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\n\nclass LifecycleOutcome(LifecycleAPI, Component):\n    display_name = 'Run Outcome'\n    description = 'A concise, inspectable result for this lifecycle event.'\n    icon = 'circle-check'\n    name = 'LifecycleOutcome'\n    inputs = [HandleInput(name='input_data', display_name='Stage Result', input_types=['Data'], required=True)]\n    outputs = [Output(display_name='Result', name='result', method='process')]\n\n    def process(self) -> Data:\n        event = self._data(self.input_data)\n        fields = ('event_type', 'status', 'action', 'reason', 'issue_key', 'issue_url', 'pr_url', 'pr_number', 'jira_status',\n                  'lifecycle_stage', 'expected_branch', 'resume_status', 'request_id', 'event_id', 'warning', 'occurrence_count')\n        result = {key: event[key] for key in fields if key in event}\n        result.setdefault('status', 'ignored')\n        if event.get('route_reason'):\n            result.setdefault('reason', event['route_reason'])\n        self.status = result\n        return Data(data=result)\n",
+                "type": "code"
+              },
+              "input_data": {
+                "_input_type": "HandleInput",
+                "name": "input_data",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "Ignored-lifecycle",
+        "type": "genericNode",
+        "position": {
+          "x": 440,
+          "y": 800
+        },
+        "data": {
+          "id": "Ignored-lifecycle",
+          "type": "CustomComponent",
+          "node": {
+            "name": "LifecycleOutcome",
+            "display_name": "Ignored Event",
+            "description": "Successful logs and unsupported events finish without creating tickets or PRs.",
+            "icon": "circle-minus",
+            "base_classes": [
+              "Component",
+              "Data"
+            ],
+            "template": {
+              "_type": "Component",
+              "code": {
+                "value": "\"\"\"Shared HTTP and payload helpers embedded into lifecycle graph components.\n\nThe flow builder inlines this mixin, so imported flows have no local-file\nruntime dependency. Credentials are always read inside the LangFlow server.\n\"\"\"\nimport base64\nimport json\nimport os\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom typing import Any\n\n\nclass LifecycleAPI:\n    @staticmethod\n    def _data(value: Any) -> dict:\n        if hasattr(value, 'data'):\n            value = value.data\n        if not isinstance(value, dict):\n            raise ValueError('This stage requires structured lifecycle data')\n        return dict(value)\n\n    def _request(self, service: str, endpoint: str, method: str = 'GET', body=None):\n        if service == 'GitHub':\n            token = os.environ.get('GITHUB_TOKEN', '').strip()\n            if not token:\n                raise ValueError('GITHUB_TOKEN is not configured')\n            base = 'https://api.github.com'\n            headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}\n        else:\n            base = os.environ.get('JIRA_BASE_URL', '').rstrip('/')\n            email = os.environ.get('JIRA_EMAIL', '').strip()\n            token = os.environ.get('JIRA_API_TOKEN', '').strip()\n            if not base or not email or not token:\n                raise ValueError('Jira credentials are not configured')\n            auth = base64.b64encode(f'{email}:{token}'.encode()).decode()\n            headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}\n        headers['Content-Type'] = 'application/json'\n        request = urllib.request.Request(base + endpoint, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(request, timeout=20) as response:\n                text = response.read().decode()\n                return json.loads(text) if text else {}\n        except urllib.error.HTTPError as error:\n            detail = error.read().decode(errors='replace') if error.fp else ''\n            failure = RuntimeError(f'{service} API error ({error.code}): {detail[:300]}')\n            failure.status_code = error.code\n            raise failure from error\n\n    def _github(self, endpoint, method='GET', body=None):\n        return self._request('GitHub', endpoint, method, body)\n\n    def _jira(self, endpoint, method='GET', body=None):\n        return self._request('Jira', endpoint, method, body)\n\n    @staticmethod\n    def _issue_path(key):\n        return '/rest/api/3/issue/' + urllib.parse.quote(key, safe='')\n\n    @staticmethod\n    def _repo_path(context):\n        return '/repos/' + urllib.parse.quote(context['owner'], safe='') + '/' + urllib.parse.quote(context['repository'], safe='')\n\n    def _comment_once(self, key, text, marker=None):\n        \"\"\"Look through paginated comments so event retries do not spam Jira.\"\"\"\n        start = 0\n        while True:\n            page = self._jira(f'{self._issue_path(key)}/comment?startAt={start}&maxResults=100')\n            comments = page.get('comments') or []\n            if (marker or text) in json.dumps([comment.get('body') for comment in comments]):\n                return\n            start += len(comments)\n            if not comments or start >= page.get('total', start):\n                break\n        self._jira(f'{self._issue_path(key)}/comment', 'POST', {'body': {'type': 'doc', 'version': 1, 'content': [{'type': 'paragraph', 'content': [{'type': 'text', 'text': text}]}]}})\n\n\nfrom langflow.custom import Component\nfrom langflow.io import HandleInput, Output\nfrom langflow.schema import Data\n\n\n\nclass LifecycleOutcome(LifecycleAPI, Component):\n    display_name = 'Run Outcome'\n    description = 'A concise, inspectable result for this lifecycle event.'\n    icon = 'circle-check'\n    name = 'LifecycleOutcome'\n    inputs = [HandleInput(name='input_data', display_name='Stage Result', input_types=['Data'], required=True)]\n    outputs = [Output(display_name='Result', name='result', method='process')]\n\n    def process(self) -> Data:\n        event = self._data(self.input_data)\n        fields = ('event_type', 'status', 'action', 'reason', 'issue_key', 'issue_url', 'pr_url', 'pr_number', 'jira_status',\n                  'lifecycle_stage', 'expected_branch', 'resume_status', 'request_id', 'event_id', 'warning', 'occurrence_count')\n        result = {key: event[key] for key in fields if key in event}\n        result.setdefault('status', 'ignored')\n        if event.get('route_reason'):\n            result.setdefault('reason', event['route_reason'])\n        self.status = result\n        return Data(data=result)\n",
+                "type": "code"
+              },
+              "input_data": {
+                "_input_type": "HandleInput",
+                "name": "input_data",
+                "display_name": "Input",
+                "type": "other",
+                "value": "",
+                "input_types": [
+                  "Data",
+                  "JSON",
+                  "Message"
+                ],
+                "required": true,
+                "show": true,
+                "advanced": false,
+                "api_editable": false
+              }
+            },
+            "outputs": [
+              {
+                "name": "result",
+                "display_name": "Result",
+                "types": [
+                  "Data"
+                ],
+                "selected": "Data",
+                "method": "process",
+                "value": "__UNDEFINED__",
+                "cache": true
+              }
+            ]
+          }
+        },
+        "selected": false,
+        "width": 300,
+        "height": 220
+      },
+      {
+        "id": "note-overview",
+        "type": "noteNode",
+        "position": {
+          "x": 80,
+          "y": -300
+        },
+        "data": {
+          "id": "note-overview",
+          "type": "note",
+          "node": {
+            "description": "# Incident lifecycle\n\n**One flow · two event types · one controlled outcome**\n\nApplication errors create a Jira incident. A developer implements and pushes the fix. The resolved Jira event returns to this same flow to verify the branch, open a PR, and link it back.\n\nInspect node outputs and Traces for real execution results. The handoff is a human step between runs, not a long-running background wait.",
+            "display_name": "",
+            "template": {
+              "backgroundColor": "#edf3ff"
+            }
+          }
+        },
+        "style": {
+          "width": 650,
+          "height": 330
+        },
+        "measured": {
+          "width": 650,
+          "height": 330
+        },
+        "width": 650,
+        "height": 330,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "note-intake",
+        "type": "noteNode",
+        "position": {
+          "x": 820,
+          "y": -170
+        },
+        "data": {
+          "id": "note-intake",
+          "type": "note",
+          "node": {
+            "description": "## 01 / Detect and record\nNormalize the failure → correlate it → create or update Jira → hand off to the developer.",
+            "display_name": "",
+            "template": {
+              "backgroundColor": "#edf3ff"
+            }
+          }
+        },
+        "style": {
+          "width": 1380,
+          "height": 120
+        },
+        "measured": {
+          "width": 1380,
+          "height": 120
+        },
+        "width": 1380,
+        "height": 120,
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "note-resolution",
+        "type": "noteNode",
+        "position": {
+          "x": 820,
+          "y": 260
+        },
+        "data": {
+          "id": "note-resolution",
+          "type": "note",
+          "node": {
+            "description": "## 02 / Resolve and deliver\nDeveloper pushes **fix/<JIRA-KEY>**, then resolves the ticket to **Completed**. The watcher sends that event to this same webhook.",
+            "display_name": "",
+            "template": {
+              "backgroundColor": "#edf3ff"
+            }
+          }
+        },
+        "style": {
+          "width": 1380,
+          "height": 130
+        },
+        "measured": {
+          "width": 1380,
+          "height": 130
+        },
+        "width": 1380,
+        "height": 130,
+        "selected": false,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "id": "Webhook-lifecycle:output_data->Route-lifecycle:input_data",
+        "source": "Webhook-lifecycle",
+        "target": "Route-lifecycle",
+        "sourceHandle": "{œdataTypeœ:œWebhookœ,œidœ:œWebhook-lifecycleœ,œnameœ:œoutput_dataœ,œoutput_typesœ:[œJSONœ]}",
+        "targetHandle": "{œfieldNameœ:œinput_dataœ,œidœ:œRoute-lifecycleœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "Webhook",
+            "id": "Webhook-lifecycle",
+            "name": "output_data",
+            "output_types": [
+              "JSON"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "input_data",
+            "id": "Route-lifecycle",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "Route-lifecycle:incident->Normalize-incident:input_data",
+        "source": "Route-lifecycle",
+        "target": "Normalize-incident",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œRoute-lifecycleœ,œnameœ:œincidentœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œinput_dataœ,œidœ:œNormalize-incidentœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Route-lifecycle",
+            "name": "incident",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "input_data",
+            "id": "Normalize-incident",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false,
+        "label": "Application error"
+      },
+      {
+        "id": "Route-lifecycle:jira->Parse-resolution:input_data",
+        "source": "Route-lifecycle",
+        "target": "Parse-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œRoute-lifecycleœ,œnameœ:œjiraœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œinput_dataœ,œidœ:œParse-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Route-lifecycle",
+            "name": "jira",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "input_data",
+            "id": "Parse-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false,
+        "label": "Jira status event"
+      },
+      {
+        "id": "Route-lifecycle:ignored->Ignored-lifecycle:input_data",
+        "source": "Route-lifecycle",
+        "target": "Ignored-lifecycle",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œRoute-lifecycleœ,œnameœ:œignoredœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œinput_dataœ,œidœ:œIgnored-lifecycleœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Route-lifecycle",
+            "name": "ignored",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "input_data",
+            "id": "Ignored-lifecycle",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false,
+        "label": "No action"
+      },
+      {
+        "id": "Normalize-incident:result->Fingerprint-incident:incident",
+        "source": "Normalize-incident",
+        "target": "Fingerprint-incident",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œNormalize-incidentœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œincidentœ,œidœ:œFingerprint-incidentœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Normalize-incident",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "incident",
+            "id": "Fingerprint-incident",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "Fingerprint-incident:result->JiraTicket-incident:incident",
+        "source": "Fingerprint-incident",
+        "target": "JiraTicket-incident",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œFingerprint-incidentœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œincidentœ,œidœ:œJiraTicket-incidentœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Fingerprint-incident",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "incident",
+            "id": "JiraTicket-incident",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "JiraTicket-incident:result->Handoff-incident:ticket",
+        "source": "JiraTicket-incident",
+        "target": "Handoff-incident",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œJiraTicket-incidentœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œticketœ,œidœ:œHandoff-incidentœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "JiraTicket-incident",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "ticket",
+            "id": "Handoff-incident",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "Parse-resolution:result->Validate-resolution:event",
+        "source": "Parse-resolution",
+        "target": "Validate-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œParse-resolutionœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œeventœ,œidœ:œValidate-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Parse-resolution",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "event",
+            "id": "Validate-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "Validate-resolution:result->Prepare-resolution:event",
+        "source": "Validate-resolution",
+        "target": "Prepare-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œValidate-resolutionœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œeventœ,œidœ:œPrepare-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Validate-resolution",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "event",
+            "id": "Prepare-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "Prepare-resolution:result->Verify-resolution:context",
+        "source": "Prepare-resolution",
+        "target": "Verify-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œPrepare-resolutionœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œcontextœ,œidœ:œVerify-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Prepare-resolution",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "context",
+            "id": "Verify-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "Verify-resolution:result->OpenPR-resolution:context",
+        "source": "Verify-resolution",
+        "target": "OpenPR-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œVerify-resolutionœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œcontextœ,œidœ:œOpenPR-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "Verify-resolution",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "context",
+            "id": "OpenPR-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "OpenPR-resolution:result->LinkJira-resolution:context",
+        "source": "OpenPR-resolution",
+        "target": "LinkJira-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œOpenPR-resolutionœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œcontextœ,œidœ:œLinkJira-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "OpenPR-resolution",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "context",
+            "id": "LinkJira-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      },
+      {
+        "id": "LinkJira-resolution:result->Outcome-resolution:input_data",
+        "source": "LinkJira-resolution",
+        "target": "Outcome-resolution",
+        "sourceHandle": "{œdataTypeœ:œCustomComponentœ,œidœ:œLinkJira-resolutionœ,œnameœ:œresultœ,œoutput_typesœ:[œDataœ]}",
+        "targetHandle": "{œfieldNameœ:œinput_dataœ,œidœ:œOutcome-resolutionœ,œinputTypesœ:[œDataœ,œJSONœ,œMessageœ],œtypeœ:œotherœ}",
+        "data": {
+          "sourceHandle": {
+            "dataType": "CustomComponent",
+            "id": "LinkJira-resolution",
+            "name": "result",
+            "output_types": [
+              "Data"
+            ]
+          },
+          "targetHandle": {
+            "fieldName": "input_data",
+            "id": "Outcome-resolution",
+            "inputTypes": [
+              "Data",
+              "JSON",
+              "Message"
+            ],
+            "type": "other"
+          }
+        },
+        "selected": false
+      }
+    ],
+    "viewport": {
+      "x": 35,
+      "y": 240,
+      "zoom": 0.58
+    }
+  },
+  "folder_id": "f9a4828f-5121-4e2a-b7e1-3ceb6bf29aaf"
+}

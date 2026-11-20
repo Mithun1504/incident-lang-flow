@@ -41,4 +41,5 @@ class PreparePRContext(Component):
             "base_branch": os.environ.get("GITHUB_BASE_BRANCH", "main").strip() or "main",
             "branch": f"{self.branch_prefix or 'fix/'}{key}" if key else "",
         })
+        self.status = f"{event['owner']}/{event['repository']}: {event['branch']} → {event['base_branch']}"
         return Data(data=event)

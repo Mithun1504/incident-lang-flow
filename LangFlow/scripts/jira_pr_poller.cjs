@@ -9,7 +9,7 @@ const jiraEmail = process.env.JIRA_EMAIL || "";
 const jiraToken = process.env.JIRA_API_TOKEN || "";
 const projectKey = process.env.JIRA_PROJECT_KEY || "DEMO";
 const triggerStatus = process.env.JIRA_PR_TRIGGER_STATUS || "Done";
-const langflowUrl = `${(process.env.LANGFLOW_BASE_URL || "http://localhost:7860").replace(/\/+$/, "")}/api/v1/webhook/jira_done_to_pr`;
+const langflowUrl = process.env.LANGFLOW_WEBHOOK_URL || `${(process.env.LANGFLOW_BASE_URL || "http://localhost:7860").replace(/\/+$/, "")}/api/v1/webhook/${process.env.LANGFLOW_LIFECYCLE_ENDPOINT || "incident_to_jira"}`;
 const langflowApiKey = process.env.LANGFLOW_API_KEY || "";
 const intervalMs = Math.max(5000, Number(process.env.JIRA_PR_POLL_INTERVAL_MS || 15000));
 const stateFile = path.resolve(__dirname, "..", process.env.JIRA_PR_POLLER_STATE_FILE || "runtime/jira-pr-poller-state.json");
@@ -85,7 +85,7 @@ async function runFlow(issue) {
     method: "POST",
     signal: AbortSignal.timeout(20000),
     headers: { "Content-Type": "application/json", "x-api-key": langflowApiKey },
-    body: JSON.stringify({ issue }),
+    body: JSON.stringify({ event_type: "jira.status_changed", issue }),
   });
   if (!response.ok && response.status !== 202) {
     throw new Error(`LangFlow ${response.status}: ${(await response.text()).slice(0, 300)}`);
@@ -146,7 +146,7 @@ async function main() {
   await tick();
 }
 
-module.exports = { issueQuery, findDoneIssues, pollOnce };
+module.exports = { issueQuery, findDoneIssues, pollOnce, runFlow };
 if (require.main === module) {
   main().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }

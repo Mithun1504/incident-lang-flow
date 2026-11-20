@@ -41,4 +41,5 @@ class FingerprintIncident(Component):
         incident["fingerprint"] = fingerprint
         incident["fingerprint_prefix"] = fingerprint[:8]
         incident["dedup_label"] = f"incident-{fingerprint[:8]}"
+        self.status = f"Correlated as {incident['dedup_label']}"
         return Data(data=incident)

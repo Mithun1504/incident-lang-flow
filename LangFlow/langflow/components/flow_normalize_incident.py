@@ -72,4 +72,5 @@ class NormalizeIncident(Component):
         }
         if raw.get("fingerprint"):
             incident["fingerprint"] = raw["fingerprint"]
+        self.status = f"{incident['error_type']} on {incident['route']}; request {incident['request_id']}"
         return Data(data=incident)

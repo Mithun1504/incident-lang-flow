@@ -38,4 +38,5 @@ class ValidateJiraDone(Component):
         event["trigger_status"] = expected
         event["eligible"] = bool(event.get("issue_key")) and str(event.get("status_name", "")).casefold() == expected.casefold()
         event["validation"] = "passed" if event["eligible"] else "ignored"
+        self.status = f"{event.get('issue_key')}: {event.get('status_name')} — {event['validation']}"
         return Data(data=event)

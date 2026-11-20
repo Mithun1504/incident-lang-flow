@@ -90,23 +90,36 @@ STATE_FILE=runtime/collector-state.json
 
 ## 4. How to Start the Prototype Services
 
-### Visual LangFlow pipelines
+### Single Incident Lifecycle flow
 
-The saved flows are intentionally multi-node graphs:
+One authenticated webhook routes application errors and Jira status events through
+one graph. The intake lane normalizes and fingerprints an error, creates or
+updates Jira, then returns the required developer branch. The resolution lane
+checks the live Jira status and pushed commits, opens or reuses a PR, and links it
+to Jira. The human development step happens between executions; the graph does
+not hold a request open while someone fixes an issue.
 
-```text
-incident_to_jira:
-PM2-Log-Viewer Webhook → Normalize Incident → Fingerprint Incident → Create or Update Jira Ticket
+The current replacement is staged as **Incident Lifecycle · Verification**.
+The original production flows stay active until live verification and cutover.
 
-jira_done_to_pr:
-Jira Webhook → Parse Jira Event → Check Jira Status → Prepare PR Context → Create GitHub PR
-```
-
-To rebuild the visual graphs after changing a component:
-
-```powershell
+```bash
+# Update the isolated verification graph:
+npm run flows:rebuild -- --staging
+# After verification, update the existing production endpoint:
 npm run flows:rebuild
+# After restarting the watcher, remove the old PR graph and verification graph:
+npm run flows:rebuild -- --retire-legacy
 ```
+
+Original production graphs are backed up once under `runtime/flow-backups/`.
+To roll back, restore those JSON definitions through LangFlow import/API and
+restore the previous watcher version. Never retire the legacy graph while an old
+watcher still targets it. Stop a foreground watcher with Ctrl+C, or use
+`npm run pr:stop`; start the updated watcher with `npm run pr:start`.
+
+Node outputs and native Traces show actual execution results. Incoming webhook
+jobs run in the background; an open canvas does not promise continuous live
+animation. The editor's default preview event safely takes the ignored branch.
 
 ### Step 1: Start LangFlow (Docker Compose)
 
@@ -152,7 +165,7 @@ Open the demo application UI in your browser at:
 
 ## 5. LangFlow Flow & Jira Configuration
 
-The flow named `incident_to_jira` is exposed at:
+The production **Incident Lifecycle** flow retains the compatible endpoint:
 `http://localhost:7860/api/v1/webhook/incident_to_jira`
 
 ### Structure
@@ -161,13 +174,13 @@ The flow named `incident_to_jira` is exposed at:
 3. **Fingerprint Incident** preserves the viewer fingerprint (16 hexadecimal characters) or computes SHA-256 when absent; the first eight characters form the Jira label.
 4. **Create or Update Jira Ticket** searches active issues in the configured project by label, creates the configured issue type, or records recurrence on the existing active issue. Completed/Done-category issues are excluded, so an error after completion starts a new ticket. Titles are readable, for example `button-demo (local): IntentionalPrototypeError on /api/fail-two`. Telemetry and fingerprint remain in the description.
 
-The current graphs use `flow_*.py`. The older all-in-one components and repair/create scripts are legacy and should not be used to deploy the multi-node graphs.
+The unified graph uses `flow_*.py`; `lifecycle_api.py` is inlined into exported components. Compatibility repair/create commands delegate to the unified builder. Historical flow exports are retained for reference and rollback.
 
 ### Manual UI Flow Import (if required)
 If you need to re-import the flow manually:
 1. Open LangFlow at [http://localhost:7860](http://localhost:7860).
 2. Click **My Collection** &rarr; **Import**.
-3. Select `langflow/flows/incident_to_jira.json`.
+3. Select `langflow/flows/incident_lifecycle.json` after publishing the unified graph.
 4. Ensure the flow endpoint name is set to `incident_to_jira`.
 
 ---
@@ -306,7 +319,7 @@ npm run pr:stop
 `npm run pm2:start` starts both the embedded demo and this watcher. The watcher
 searches only `automated-incident` issues in the configured project/status,
 handles pagination, and does not overlap its polling cycles. Restart it after
-changing `.env`. Do not run multiple pollers or both a webhook and a poller.
+changing `.env` or watcher code. The watcher is an event adapter, not a second LangFlow graph. It sends `event_type: jira.status_changed` to the same `LANGFLOW_WEBHOOK_URL` used by the log viewer. Do not run multiple pollers or both a webhook and a poller.
 
 For one targeted verification, without leaving a watcher running:
 
@@ -314,14 +327,14 @@ For one targeted verification, without leaving a watcher running:
 node scripts/jira_pr_poller.cjs --once --issue=SUP-4
 ```
 
-The `jira_done_to_pr` flow checks the live issue status, checks the configured
+The resolution lane of **Incident Lifecycle** checks the live issue status, checks the configured
 branch, reuses an open PR or creates one into main, and comments its URL on Jira.
 Repeated successful invocations reuse the PR and avoid repeating the same PR
 comment. Missing branches are blocked; authentication errors remain errors.
 The poller confirms the Jira PR-link comment rather than treating webhook HTTP
 acceptance as completion.
 
-Alternatively configure Jira to POST to `/api/v1/webhook/jira_done_to_pr` through
+Alternatively configure Jira to POST to `/api/v1/webhook/incident_to_jira` through
 a protected HTTPS tunnel. A browser GET is not a webhook test.
 
 ### Tests

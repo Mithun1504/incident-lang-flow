@@ -116,4 +116,5 @@ class JiraTicketWriter(Component):
             issue_type = os.environ.get("JIRA_ISSUE_TYPE", "Bug").strip()
             created = self._call("/rest/api/3/issue", "POST", {"fields": {"project": {"key": project}, "issuetype": {"name": issue_type}, "summary": summary, "description": self._description(incident, 1), "labels": ["automated-incident", "prototype", label]}})
             result.update({"status": "created", "action": "ticket_created", "issue_key": created.get("key"), "occurrence_count": 1})
+        self.status = f"{result['action']}: {result['issue_key']} (occurrence {result['occurrence_count']})"
         return Data(data=result)
