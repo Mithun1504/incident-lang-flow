@@ -49,3 +49,19 @@ test('GET /api/logs/:eventId returns 404 for unknown ID', async () => {
   const data = await res.json();
   assert.ok(data.error);
 });
+
+test('all activity is visible, incidents stay error-only, and success retries are rejected', async () => {
+  const { reader } = require('../src/server');
+  reader.processLine(JSON.stringify({ level: 'info', route: '/api/my-profile', method: 'GET', status_code: 200, request_id: 'api-success', message: 'Profile loaded' }), false);
+  reader.processLine(JSON.stringify({ level: 'error', route: '/api/simulate-failure', status_code: 503, request_id: 'api-failure', message: 'Service unavailable' }), false);
+  const logs = await (await fetch(`${baseUrl}/api/logs`)).json();
+  assert.ok(logs.logs.some(log => log.level === 'info'));
+  assert.ok(logs.logs.some(log => log.level === 'error'));
+  const success = logs.logs.find(log => log.request_id === 'api-success');
+  assert.equal(success.deliveryStatus, 'not-required');
+  const retry = await fetch(`${baseUrl}/api/retry/${success.event_id}`, { method: 'POST' });
+  assert.equal(retry.status, 400);
+  const incidents = await (await fetch(`${baseUrl}/api/incidents`)).json();
+  assert.equal(incidents.incidents.length, 1);
+  assert.ok(incidents.incidents.every(log => log.level === 'error'));
+});

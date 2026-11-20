@@ -55,6 +55,10 @@ class IncidentForwarder {
    */
   async forward(incident) {
     const eventId = incident.event_id;
+    // Enforce this at the delivery boundary as well as in the API/UI.
+    if (incident.level && incident.level !== 'error') {
+      return { success: false, status: 'not-required', message: 'Only error events can trigger incident automation.' };
+    }
 
     if (!this.forwardEnabled) {
       const statusInfo = {

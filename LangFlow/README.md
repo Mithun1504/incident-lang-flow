@@ -1,7 +1,7 @@
 # Incident Management Automation Prototype (Phase 1: Local)
 
 A local teaching prototype integrating:
-`Four-Button Express App` &rarr; `PM2` &rarr; `PM2-Log-Viewer` &rarr; `LangFlow Webhook` &rarr; `Jira Cloud Bug Ticket`
+`Northstar Express Workspace` &rarr; `PM2` &rarr; `PM2-Log-Viewer` &rarr; `LangFlow Webhook` &rarr; `Jira Cloud Bug Ticket`
 
 ---
 
@@ -15,10 +15,10 @@ LangFlow/
 ├── ecosystem.config.cjs         # PM2 ecosystem configuration
 ├── package.json                 # Project scripts and dependencies
 ├── pm2.js                       # Cross-platform PM2 workspace runner
-├── app/                         # Four-button Express demo application
+├── app/                         # Five-page Express demo workspace
 │   ├── server.js                # Backend with error generation & health endpoints
 │   └── public/
-│       ├── index.html           # 4-button UI
+│       ├── index.html           # Business workspace UI
 │       ├── style.css            # Responsive stylesheet
 │       └── app.js               # Frontend button interactions
 ├── collector/                   # Disabled legacy direct collector
@@ -213,29 +213,14 @@ curl -X POST http://localhost:7860/api/v1/webhook/incident_to_jira \
 
 ## 7. Local End-to-End Verification Procedure
 
-1. **Verify Success Actions**:
-   - Click **Success 1 (Turn Red)** &rarr; Page turns red, returns HTTP 200.
-   - Click **Success 2 (Turn Blue)** &rarr; Page turns blue, returns HTTP 200.
-2. **Trigger First Failure**:
-   - Click **Fail Button 1** &rarr; Page background does not change, returns HTTP 500.
-   - Inspect PM2 error log:
-     ```powershell
-     Get-Content runtime/pm2/button-demo-error.log -Tail 1
-     ```
-   - Observe PM2-Log-Viewer delivery status:
-     ```
-     [PM2-Log-Viewer] ... deliveryStatus=forwarded ...
-     ```
-   - Verify Jira Bug ticket creation with labels `automated-incident`, `prototype`, `incident-3c479206`.
-3. **Trigger Duplicate Failure**:
-   - Click **Fail Button 1** again.
-   - Verify PM2-Log-Viewer emits the same fingerprint (`3c479206`).
-   - Verify LangFlow updates the existing Jira ticket with a recurrence comment and updated occurrence count.
-4. **Trigger Distinct Failure**:
-   - Click **Fail Button 2**.
-   - Verify new distinct fingerprint (`ccb50cd0`) and corresponding new incident ticket.
+1. Open the demo at `http://localhost:3000` and the viewer at `http://localhost:3001`.
+2. Navigate Dashboard, My profile, Projects, Team, and Settings. Each page calls a corresponding `/api/*` endpoint. The viewer must show successful HTTP 200 requests with delivery **Not required**. No Jira tickets should be created for these requests.
+3. Save a profile or notification preference to see PATCH/PUT request logs. Changes are stored in memory for the current demo session.
+4. Click **Simulate service failure** in the workspace header. It calls `POST /api/simulate-failure`, returns HTTP 503, and emits one structured error to stderr.
+5. Confirm the viewer displays the failure and forwards only that error to LangFlow. Confirm Jira creation separately; HTTP acceptance alone is not ticket confirmation.
+6. Repeat the failure while its Jira ticket is active to verify recurrence on that ticket. After completion, a new failure creates a new ticket.
 
----
+PM2 writes successful activity to `runtime/pm2/button-demo-out.log` and failures to `runtime/pm2/button-demo-error.log`. The viewer reads both independently. The original `/api/fail-one`, `/api/fail-two`, and success endpoints remain available for existing teaching exercises.
 
 ## 8. Stop and Restart Commands
 

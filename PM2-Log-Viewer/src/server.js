@@ -7,210 +7,103 @@ const IncidentForwarder = require('./forwarder');
 
 const app = express();
 app.use(express.json());
-
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../public')));
-
-// Initialize Reader and Forwarder
+app.use(express.static(path.join(__dirname, '../public'), { etag: false, maxAge: 0 }));
 const reader = new PM2LogReader(config);
+const outReader = new PM2LogReader({ ...config, pm2LogSource: config.pm2OutLogSource, logStateFile: config.outLogStateFile });
+const readers = config.pm2OutLogSource === config.pm2LogSource ? [reader] : [reader, outReader];
 const forwarder = new IncidentForwarder(config);
-
-// Active SSE client connections
 const sseClients = new Set();
 
-function broadcastSse(eventType, data) {
-  const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) {
-    try {
-      client.res.write(payload);
-    } catch (_) {
-      sseClients.delete(client);
-    }
+function broadcastSse(type, data) {
+  for (const res of sseClients) {
+    try { res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`); }
+    catch (_) { sseClients.delete(res); }
   }
 }
-
-// When a new error incident is detected
-reader.on('incident', async (entry, isNew) => {
-  // Broadcast to all connected SSE clients
-  broadcastSse('incident', entry);
-
-  // If this is a newly appended error (not historical on boot), forward it
-  if (isNew) {
-    try {
-      const result = await forwarder.forward(entry);
-      reader.updateDeliveryStatus(entry.event_id, result);
-    } catch (err) {
-      console.error(`[Server] Error forwarding incident ${entry.event_id}:`, err.message);
+function getLogs() {
+  return readers.flatMap(r => r.getLogs()).sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp)).slice(0, 500);
+}
+function findLog(id) { return readers.map(r => r.getLogByEventId(id)).find(Boolean); }
+function updateStatus(id, status) { for (const r of readers) if (r.getLogByEventId(id)) r.updateDeliveryStatus(id, status); }
+function enrich(log) {
+  const live = forwarder.getStatus(log.event_id);
+  return { ...log, deliveryStatus: live.status !== 'received' ? live.status : log.deliveryStatus, deliveryDetails: live.status !== 'received' ? live : log.deliveryDetails || live };
+}
+for (const source of readers) {
+  source.on('error', error => console.error('[LogReader]', error.message));
+  source.on('incident', async (entry, isNew) => {
+    broadcastSse('incident', entry);
+    if (isNew && entry.level === 'error') {
+      try { updateStatus(entry.event_id, await forwarder.forward(entry)); }
+      catch (error) { console.error('[Forwarder]', error.message); }
     }
-  }
+  });
+}
+forwarder.onStatusChange((eventId, status) => {
+  updateStatus(eventId, status);
+  broadcastSse('delivery_status', { eventId, ...status });
 });
-
-// When delivery status changes (e.g., retrying, forwarded, failed)
-forwarder.onStatusChange((eventId, statusInfo) => {
-  reader.updateDeliveryStatus(eventId, statusInfo);
-  broadcastSse('delivery_status', { eventId, ...statusInfo });
-});
-
-// GET /api/health
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'pm2-log-viewer',
-    port: config.port,
-    uptimeSeconds: Math.floor(process.uptime()),
-    forwardEnabled: forwarder.forwardEnabled,
-    logSource: config.pm2LogSource,
-    logSourceExists: fs.existsSync(config.pm2LogSource),
-    lastByteOffset: reader.lastByteOffset,
-    totalLogs: reader.getLogs().length,
-    outboxPending: forwarder.outbox.count(),
-    timestamp: new Date().toISOString()
-  });
+  const logs = getLogs().map(enrich);
+  res.json({ status: 'ok', service: 'pm2-log-viewer', port: config.port,
+    uptimeSeconds: Math.floor(process.uptime()), forwardEnabled: forwarder.forwardEnabled,
+    logSource: config.pm2LogSource, logSourceExists: readers.some(r => fs.existsSync(r.logSource)),
+    logSources: readers.map(r => ({ path: r.logSource, exists: fs.existsSync(r.logSource), offset: r.lastByteOffset })),
+    lastByteOffset: readers.reduce((sum, r) => sum + r.lastByteOffset, 0), totalLogs: logs.length,
+    successfulRequests: logs.filter(l => l.status_code >= 200 && l.status_code < 400).length,
+    totalErrors: logs.filter(l => l.level === 'error').length,
+    forwardedErrors: logs.filter(l => l.deliveryStatus === 'forwarded').length,
+    outboxPending: forwarder.outbox.count(), timestamp: new Date().toISOString() });
 });
-
-// GET /api/logs
+function limit(req) { return Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 100)); }
 app.get('/api/logs', (req, res) => {
-  const limit = parseInt(req.query.limit, 10) || 100;
-  const allLogs = reader.getLogs();
-  const sliced = allLogs.slice(0, limit);
-
-  // Enrich with latest live delivery status from forwarder
-  const enriched = sliced.map((log) => {
-    const liveStatus = forwarder.getStatus(log.event_id);
-    return {
-      ...log,
-      deliveryStatus: liveStatus.status !== 'received' ? liveStatus.status : log.deliveryStatus,
-      deliveryDetails: liveStatus
-    };
-  });
-
-  res.json({
-    total: allLogs.length,
-    limit,
-    logs: enriched
-  });
+  const logs = getLogs();
+  res.json({ total: logs.length, limit: limit(req), logs: logs.slice(0, limit(req)).map(enrich) });
 });
-
-// Integration-friendly alias: this application owns the normalized incidents.
-// LangFlow receives the pushed webhook; this endpoint supports audits/future
-// consumers without exposing the underlying PM2 file as their data source.
 app.get('/api/incidents', (req, res) => {
-  const limit = parseInt(req.query.limit, 10) || 100;
-  const incidents = reader.getLogs().slice(0, limit).map((log) => {
-    const liveStatus = forwarder.getStatus(log.event_id);
-    return {
-      ...log,
-      deliveryStatus: liveStatus.status !== 'received' ? liveStatus.status : log.deliveryStatus,
-      deliveryDetails: liveStatus
-    };
-  });
-  res.json({ source: 'pm2-log-viewer', total: reader.getLogs().length, limit, incidents });
+  const incidents = getLogs().filter(l => l.level === 'error');
+  res.json({ source: 'pm2-log-viewer', total: incidents.length, limit: limit(req), incidents: incidents.slice(0, limit(req)).map(enrich) });
 });
-
-// GET /api/logs/:eventId
 app.get('/api/logs/:eventId', (req, res) => {
-  const { eventId } = req.params;
-  const log = reader.getLogByEventId(eventId);
-  if (!log) {
-    return res.status(404).json({ error: `Log event not found: ${eventId}` });
-  }
-
-  const liveStatus = forwarder.getStatus(log.event_id);
-  res.json({
-    ...log,
-    deliveryStatus: liveStatus.status !== 'received' ? liveStatus.status : log.deliveryStatus,
-    deliveryDetails: liveStatus
-  });
+  const log = findLog(req.params.eventId);
+  if (!log) return res.status(404).json({ error: 'Log event not found.' });
+  res.json(enrich(log));
 });
-
-// GET /api/events/stream - Server-Sent Events
 app.get('/api/events/stream', (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
-  });
-
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
   res.write(': connected\n\n');
-
-  const client = { id: Date.now(), res };
-  sseClients.add(client);
-
-  // Send periodic ping to prevent connection drops
-  const pingTimer = setInterval(() => {
-    try {
-      res.write(': ping\n\n');
-    } catch (_) {
-      clearInterval(pingTimer);
-      sseClients.delete(client);
-    }
-  }, 15000);
-
-  req.on('close', () => {
-    clearInterval(pingTimer);
-    sseClients.delete(client);
-  });
+  sseClients.add(res);
+  const ping = setInterval(() => res.write(': ping\n\n'), 15000);
+  req.on('close', () => { clearInterval(ping); sseClients.delete(res); });
 });
-
-// POST /api/retry/:eventId - Retry forwarding a specific log manually
 app.post('/api/retry/:eventId', async (req, res) => {
-  const { eventId } = req.params;
-  const log = reader.getLogByEventId(eventId);
-  if (!log) {
-    return res.status(404).json({ error: `Log event not found: ${eventId}` });
-  }
-
+  const log = findLog(req.params.eventId);
+  if (!log) return res.status(404).json({ error: 'Log event not found.' });
+  if (log.level !== 'error') return res.status(400).json({ error: 'Successful and informational requests do not trigger Jira automation.' });
   const result = await forwarder.forward(log);
-  reader.updateDeliveryStatus(eventId, result);
+  updateStatus(log.event_id, result);
   res.json({ success: result.success, result });
 });
-
-// POST /api/retry-all - Trigger manual outbox flush
 app.post('/api/retry-all', async (req, res) => {
   await forwarder.drainOutbox();
   res.json({ success: true, pendingCount: forwarder.outbox.count() });
 });
-
-// POST /api/toggle-forward - Toggle forwarding mode (live vs dry-run)
 app.post('/api/toggle-forward', (req, res) => {
   forwarder.forwardEnabled = !forwarder.forwardEnabled;
   broadcastSse('config_change', { forwardEnabled: forwarder.forwardEnabled });
   res.json({ forwardEnabled: forwarder.forwardEnabled });
 });
-
-let server = null;
-
+let server;
 function startServer(port = config.port) {
-  reader.start();
-  server = app.listen(port, () => {
-    console.log(`[PM2-Log-Viewer] Server running at http://localhost:${port}`);
-    console.log(`[PM2-Log-Viewer] Monitoring log file: ${config.pm2LogSource}`);
-    console.log(`[PM2-Log-Viewer] Forwarding enabled: ${forwarder.forwardEnabled}`);
-    console.log(`[PM2-Log-Viewer] Webhook target: ${config.langflowWebhookUrl}`);
-  });
+  readers.forEach(r => r.start());
+  server = app.listen(port, () => console.log(`[PM2-Log-Viewer] Activity logs at http://localhost:${port}`));
   return server;
 }
-
 function stopServer(callback) {
-  reader.stop();
-  forwarder.stop();
-  if (server) {
-    server.close(callback);
-  } else if (callback) {
-    callback();
-  }
+  readers.forEach(r => r.stop()); forwarder.stop();
+  for (const res of sseClients) res.end();
+  sseClients.clear();
+  if (server) server.close(callback); else if (callback) callback();
 }
-
-// Start if executed directly
-if (require.main === module) {
-  startServer();
-}
-
-module.exports = {
-  app,
-  startServer,
-  stopServer,
-  reader,
-  forwarder
-};
+if (require.main === module) startServer();
+module.exports = { app, startServer, stopServer, reader, outReader, forwarder };

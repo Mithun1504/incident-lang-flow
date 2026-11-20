@@ -44,11 +44,15 @@ function generateFingerprint(service, route, errorType, message) {
  * Normalizes a raw PM2 log object into the standard incident payload
  */
 function normalizeIncident(rawEntry, options = {}) {
+  const level = String(rawEntry.level || 'error').toLowerCase();
+  const rawStatus = Number(rawEntry.status_code ?? rawEntry.http_status);
+  const statusCode = Number.isInteger(rawStatus) && rawStatus >= 100 && rawStatus <= 599
+    ? rawStatus : level === 'error' ? 500 : null;
   const service = rawEntry.service || options.service || 'unknown-service';
   const environment = rawEntry.environment || options.environment || 'local';
   const route = rawEntry.route || options.route || 'unknown-route';
   const errorType =
-    rawEntry.error_type || rawEntry.name || rawEntry.type || 'UnknownError';
+    rawEntry.error_type || rawEntry.name || rawEntry.type || (level === 'error' ? 'UnknownError' : null);
   const message = rawEntry.message || 'No error message provided';
   const stackTrace = normalizeStackTrace(
     rawEntry.stack_trace || rawEntry.stack || ''
@@ -66,8 +70,8 @@ function normalizeIncident(rawEntry, options = {}) {
   }
 
   // Generate unique event_id
-  const randomSuffix = crypto.randomBytes(4).toString('hex');
-  const eventId = `evt_${Date.now()}_${randomSuffix}`;
+  const eventKey = [service, requestId, timestamp, route, level].join('|');
+  const eventId = rawEntry.event_id || `evt_${crypto.createHash('sha256').update(eventKey).digest('hex').slice(0, 24)}`;
 
   // Log reference
   const logReference =
@@ -76,11 +80,14 @@ function normalizeIncident(rawEntry, options = {}) {
 
   // Deterministic fingerprint
   const fingerprint =
-    rawEntry.fingerprint ||
-    generateFingerprint(service, route, errorType, message);
+    level === 'error' ? rawEntry.fingerprint || generateFingerprint(service, route, errorType, message) : null;
 
   return {
     source: 'pm2-log-viewer',
+    level,
+    method: rawEntry.method || 'POST',
+    status_code: statusCode,
+    duration_ms: Number.isFinite(rawEntry.duration_ms) ? rawEntry.duration_ms : null,
     service,
     environment,
     route,

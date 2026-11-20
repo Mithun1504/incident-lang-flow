@@ -18,7 +18,7 @@ test.after(() => {
   } catch (_) {}
 });
 
-test('PM2LogReader reads lines incrementally, tracks offset, and ignores non-JSON & non-errors', async (t) => {
+test('PM2LogReader reads lines incrementally, tracks offset, includes info, and ignores non-JSON', async (t) => {
   const logFile = path.join(testDir, 'test-app.log');
   const stateFile = path.join(testDir, 'test-state.json');
 
@@ -45,7 +45,7 @@ test('PM2LogReader reads lines incrementally, tracks offset, and ignores non-JSO
 
   // First boot should load existing error into logs cache without forwarding
   const logs = reader.getLogs();
-  assert.equal(logs.length, 1);
+  assert.equal(logs.length, 2);
   assert.equal(logs[0].message, 'Error 1');
   assert.equal(logs[0].deliveryStatus, 'received');
   assert.ok(reader.lastByteOffset > 0);
@@ -68,7 +68,7 @@ test('PM2LogReader reads lines incrementally, tracks offset, and ignores non-JSO
 
   assert.ok(newIncidentReceived, 'Expected new incident to be emitted');
   assert.equal(newIncidentReceived.message, 'Error 2');
-  assert.equal(reader.getLogs().length, 2);
+  assert.equal(reader.getLogs().length, 4);
 });
 
 test('PM2LogReader handles log rotation or truncation', async (t) => {

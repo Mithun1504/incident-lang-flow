@@ -5,7 +5,7 @@
   "main": "app/server.js",
   "type": "commonjs",
   "scripts": {
-    "test": "python3 -B -m unittest discover -s test -p 'test_*.py'",
+    "test": "python3 -B -m unittest discover -s test -p 'test_*.py' && node --test test/*.test.js",
     "start": "node app/server.js",
     "pm2:start": "node pm2.js start ecosystem.config.cjs",
     "pm2:stop": "node pm2.js stop button-demo",

@@ -117,3 +117,14 @@ test('IncidentForwarder retries on failure and enqueues to outbox', async (t) =>
   assert.equal(forwarder.outbox.count(), 1);
   assert.ok(fs.existsSync(outboxFile));
 });
+
+test('successful and warning logs cannot be forwarded or queued even when forwarding is enabled', async (t) => {
+  const forwarder = new IncidentForwarder({ forwardEnabled: true, outboxFile: path.join(testDir, 'non-errors.json') });
+  t.after(() => forwarder.stop());
+  forwarder.sendHttpRequest = async () => { throw new Error('Non-error delivery must never be attempted'); };
+  for (const level of ['info', 'warn', 'debug']) {
+    const result = await forwarder.forward({ event_id: `evt_${level}`, level });
+    assert.equal(result.status, 'not-required');
+    assert.equal(forwarder.outbox.count(), 0);
+  }
+});

@@ -1,200 +1,69 @@
-# PM2 Log Viewer & Incident Forwarder
+# PM2 Log Viewer
 
-An independent Node.js log-monitoring dashboard and webhook forwarder running on port `3001`. It incrementally tails PM2 JSON error logs, normalizes them into structured incident events, visualizes them in real time with Server-Sent Events (SSE), and forwards new error incidents to the LangFlow webhook to trigger Jira ticket automation.
+A light-theme request activity dashboard. It reads PM2 stdout and stderr, displays successful requests, warnings, and failures in one live table, and forwards only error-level events to LangFlow.
 
----
+## Run
 
-## Architecture Flow
-
-```
-+------------------------------------+
-|  PM2 Application (e.g. port 3000)  |
-|  Writes JSON error entries to:     |
-|  runtime/pm2/button-demo-error.log |
-+------------------+-----------------+
-                   |
-                   v (Incremental byte offset tailing)
-+------------------+-----------------+
-|   PM2-Log-Viewer (Port 3001)       |
-|  - Real-time Web UI Dashboard      |
-|  - Tracks offset in state file     |
-|  - Normalizes stack & fingerprints |
-|  - Exponential backoff & outbox    |
-+------------------+-----------------+
-                   |
-                   v (POST /api/v1/webhook/incident_to_jira + x-api-key)
-+------------------+-----------------+
-|      LangFlow (Port 7860)          |
-|  - Validates payload               |
-|  - Custom Jira Component           |
-+------------------+-----------------+
-                   |
-                   v (Atlassian REST API)
-+------------------+-----------------+
-|         Jira Cloud (DEMO)          |
-|  - Creates or deduplicates Bug     |
-+------------------------------------+
-```
-
----
-
-## Folder Structure
-
-```
-PM2-Log-Viewer/
-├── .env.example              # Sample environment configuration template
-├── .env                      # Local configuration (API keys, ports, paths)
-├── .gitignore                # Git ignore rules (node_modules, runtime states)
-├── package.json              # Project metadata, dependencies, and npm scripts
-├── README.md                 # Project documentation
-├── public/                   # Frontend assets served at http://localhost:3001
-│   ├── index.html            # Dashboard layout and metric cards
-│   ├── style.css             # Modern dark slate styling & responsive layout
-│   └── app.js                # SSE client, search/filter, and retry actions
-├── runtime/                  # Dynamic runtime state & retry persistence
-│   ├── log-viewer-state.json # Persistent byte offset & processed fingerprints
-│   └── outbox.json           # Outbox queue for temporary webhook failures
-├── scripts/
-│   └── lint.js               # JavaScript syntax and integrity linter
-├── src/
-│   ├── config.js             # Configuration loader & path resolution logic
-│   ├── normalizer.js         # Stack trace cleaner, path normalizer & SHA-256 fingerprinting
-│   ├── logReader.js          # Incremental byte offset reader with rotation handling
-│   ├── forwarder.js          # Webhook dispatcher with exponential backoff & outbox
-│   ├── outbox.js             # Outbox persistence and retry scheduler
-│   └── server.js             # Express API server, SSE stream & static server
-└── test/
-    ├── normalizer.test.js    # Unit tests for incident normalization & fingerprints
-    ├── logReader.test.js     # Incremental reading & truncation tests
-    ├── forwarder.test.js     # Dry-run, retry, and HTTP 202 acceptance tests
-    └── api.test.js           # REST API endpoint tests & security assertions
-```
-
----
-
-## Configuration (`.env`)
-
-Configuration is loaded exclusively from `PM2-Log-Viewer/.env`:
-
-```ini
-# Path to the PM2 error log (resolved relative to PM2-Log-Viewer root)
-PM2_LOG_SOURCE=../LangFlow/runtime/pm2/button-demo-error.log
-
-# Port for the PM2-Log-Viewer web server & dashboard
-PORT=3001
-
-# LangFlow Incident Webhook Endpoint
-LANGFLOW_WEBHOOK_URL=http://localhost:7860/api/v1/webhook/incident_to_jira
-
-# LangFlow API Key (sent in x-api-key header)
-LANGFLOW_API_KEY=<your-langflow-api-key>
-
-# Persistent state file for byte offset tracking
-LOG_STATE_FILE=runtime/log-viewer-state.json
-
-# Local retry outbox for failed deliveries
-OUTBOX_FILE=runtime/outbox.json
-
-# Forwarding switch: true to forward to LangFlow, false for Dry-Run mode
-FORWARD_ENABLED=true
-```
-
-### How `PM2_LOG_SOURCE` is Resolved
-
-`PM2_LOG_SOURCE` is resolved **strictly relative to the `PM2-Log-Viewer` application directory**, rather than the process working directory (`process.cwd()`):
-
-```javascript
-const appRootDir = path.resolve(__dirname, '..');
-const logSourcePath = path.isAbsolute(process.env.PM2_LOG_SOURCE)
-  ? process.env.PM2_LOG_SOURCE
-  : path.resolve(appRootDir, process.env.PM2_LOG_SOURCE);
-```
-
-This guarantees that whether you start the application from `C:/`, `C:/Users/USER/Desktop/Ellipsonic-Projects`, or `C:/Users/USER/Desktop/Ellipsonic-Projects/PM2-Log-Viewer`, it will reliably locate `../LangFlow/runtime/pm2/button-demo-error.log`.
-
----
-
-## Important Testing Precaution
-
-> [!IMPORTANT]
-> **Stop the legacy PM2 collector before testing to avoid duplicate tickets!**
-> If the older background collector script in `LangFlow/` is running concurrently, both applications will detect new error log entries and both will submit events to LangFlow.
-> Ensure only `PM2-Log-Viewer` is running to tail the log.
-
----
-
-## Dry-Run Mode (Testing without Creating Jira Tickets)
-
-To monitor and test the UI and log reader without sending events to LangFlow or creating Jira tickets:
-
-1. **Option A (Via `.env`)**:
-   Set `FORWARD_ENABLED=false` in `.env`.
-   When a new error arrives, the UI will display it with status `DRY-RUN`, and no HTTP requests will be made.
-
-2. **Option B (Via UI)**:
-   In the header of `http://localhost:3001`, click the **Mode: Forwarding: ON** badge. It will toggle to **Dry-Run: ON** on the fly without restarting the server.
-
----
-
-## Getting Started
-
-### 1. Install Dependencies
 ```bash
-cd C:/Users/USER/Desktop/Ellipsonic-Projects/PM2-Log-Viewer
-npm install
+npm ci
+npm start
 ```
 
-### 2. Run Lint & Automated Tests
+Open http://localhost:3001. `npm run dev` starts with Node's file watcher.
+
+After a backend change, stop the viewer with Ctrl+C and start it again. Restart the demo application after changing its server code. Static frontend changes need only a browser reload.
+
+## Configuration
+
+Copy `.env.example` to `.env` for a new setup. Paths resolve relative to this viewer's directory.
+
+| Variable | Purpose |
+|---|---|
+| `PM2_LOG_SOURCE` | PM2 stderr file, including structured application errors |
+| `PM2_OUT_LOG_SOURCE` | PM2 stdout file, including successful requests; when omitted, derived from the error filename by replacing `error.log` with `out.log` |
+| `LOG_STATE_FILE` | Persistent stderr read offset and forwarded IDs |
+| `OUT_LOG_STATE_FILE` | Independent stdout read offset |
+| `OUTBOX_FILE` | Persistent failed-error delivery queue |
+| `PORT` | Viewer port, default 3001 |
+| `LANGFLOW_WEBHOOK_URL` | Incident webhook endpoint |
+| `LANGFLOW_API_KEY` | Server-side `x-api-key` credential |
+| `FORWARD_ENABLED` | `true` forwards errors; `false` records dry-run delivery |
+| `POLL_INTERVAL_MS` | File polling interval, default 1000 |
+| `MAX_RETRIES` | Immediate delivery attempts, default 3 |
+| `RETRY_DELAY_MS` | Initial retry delay, default 1000 |
+
+The existing setup reads `../LangFlow/runtime/pm2/button-demo-error.log` and `../LangFlow/runtime/pm2/button-demo-out.log`. When using another demo copy, point both source variables at that application's files.
+
+There is no need to reset or delete existing log state. Each stream has its own state file. Historical lines appear without being automatically forwarded on first startup. Event IDs are stable for structured entries with request IDs and timestamps, allowing delivery history to survive a restart.
+
+## Dashboard
+
+The default view shows all activity, newest first, capped at 500 entries. Filter by successful requests, errors, warnings, text, and delivery status. Expand a row for its message, correlation ID, metadata, and stack trace. Error rows offer manual delivery retry. Successful requests show **Not required** and cannot be sent to Jira through the API, UI, or forwarder.
+
+**Accepted** means LangFlow accepted the webhook, not that Jira finished creating a ticket. Confirm ticket completion in Jira or the LangFlow execution results. This redesign leaves the downstream LangFlow/Jira/PR logic unchanged.
+
+SSE pushes new requests and delivery updates. The browser falls back to polling while reconnecting. Search and filters continue to apply to live events.
+
+## APIs
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/health` | Counts, source availability, offsets, forwarding mode, pending queue |
+| GET | `/api/logs?limit=500` | All recent structured log levels |
+| GET | `/api/incidents` | Error events only, for integrations |
+| GET | `/api/logs/:eventId` | Single log by event/request ID |
+| GET | `/api/events/stream` | Live log and delivery events |
+| POST | `/api/retry/:eventId` | Retry an error; returns 400 for non-error activity |
+| POST | `/api/retry-all` | Retry eligible queued errors |
+| POST | `/api/toggle-forward` | Toggle forwarding for this process |
+
+## Verify
+
 ```bash
 npm run lint
 npm test
 ```
 
-### 3. Start the Application
-- **Production mode**:
-  ```bash
-  npm start
-  ```
-- **Development mode (auto-reload on code change)**:
-  ```bash
-  npm run dev
-  ```
+Tests cover normalization, both log levels, tailing, truncation, forwarding, and API protection. When the sibling `LangFlow/app` is present, an integration test runs five real page APIs through physical stdout/stderr files and an independent viewer process, verifying that only the HTTP 503 failure reaches a mock webhook. Tests do not create Jira tickets.
 
-Open your browser at **[http://localhost:3001](http://localhost:3001)**.
-
----
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-| :--- | :--- | :--- |
-| `/api/health` | `GET` | Service status, port, uptime, log source existence, byte offset, outbox count (zero API key leakage). |
-| `/api/logs` | `GET` | Normalized incident entries (newest first). Supports `?limit=N`. |
-| `/api/incidents` | `GET` | Normalized incidents owned by this application for integrations and audits. Supports `?limit=N`. |
-| `/api/logs/:eventId` | `GET` | Detailed JSON for a specific incident by `event_id` or `request_id`. |
-| `/api/events/stream` | `GET` | Server-Sent Events (SSE) stream for real-time live push of new errors and delivery status updates. |
-| `/api/retry/:eventId` | `POST` | Manually triggers redelivery of an incident to the LangFlow webhook. |
-| `/api/retry-all` | `POST` | Drains all pending items from the local outbox. |
-| `/api/toggle-forward` | `POST` | Toggles forwarding between active and dry-run mode. |
-
----
-
-## Key Design Details
-
-1. **Incremental Reading & State Persistence**:
-   - The exact byte offset is persisted in `runtime/log-viewer-state.json`.
-   - On server restart, the app inspects the state file and does **not** re-send already processed logs.
-   - If the log file size shrinks below `lastByteOffset`, log truncation/rotation is detected, and the offset safely resets to 0.
-
-2. **Stack Trace & Path Normalization**:
-   - Strips ANSI terminal color escape codes.
-   - Normalizes Windows backslashes in paths (`C:\...` -> `C:/...`) so payloads format cleanly across operating systems.
-
-3. **Exponential Backoff & Outbox**:
-   - Webhook deliveries are attempted with exponential backoff (`2^attempt * retryDelayMs`).
-   - Responses with HTTP 200, 201, or 202 are treated as successful.
-   - If retries fail, incidents are placed in `runtime/outbox.json` and a periodic background worker retries them automatically.
-
-4. **Safety & Zero Disruption**:
-   - The existing `LangFlow/` project, `.env`, Docker containers, and port 3000 server are strictly unmodified.
-   - API keys and tokens are never exposed in UI responses or logs.
+Do not run the disabled legacy collector alongside this viewer. Keep credentials out of browser code, runtime responses, and Git.

@@ -20,6 +20,11 @@ const config = {
     process.env.PM2_LOG_SOURCE,
     '../LangFlow/runtime/pm2/button-demo-error.log'
   ),
+  pm2OutLogSource: resolveAppPath(
+    process.env.PM2_OUT_LOG_SOURCE,
+    (process.env.PM2_LOG_SOURCE || '../LangFlow/runtime/pm2/button-demo-error.log').replace(/error\.log$/i, 'out.log')
+  ),
+  outLogStateFile: resolveAppPath(process.env.OUT_LOG_STATE_FILE, 'runtime/log-viewer-out-state.json'),
   langflowWebhookUrl:
     process.env.LANGFLOW_WEBHOOK_URL ||
     'http://localhost:7860/api/v1/webhook/incident_to_jira',

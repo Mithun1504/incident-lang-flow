@@ -62,3 +62,15 @@ test('normalizeIncident maps raw PM2 error entry into standard incident format',
   const reParsed = JSON.parse(jsonStr);
   assert.equal(reParsed.event_id, incident.event_id);
 });
+
+test('successful request metadata is retained without an incident fingerprint', () => {
+  const raw = { level: 'info', service: 'button-demo', route: '/api/my-profile', method: 'GET', status_code: 200, duration_ms: 2.14, message: 'Profile loaded', request_id: 'success-1', timestamp: '2026-11-20T10:00:00.000Z' };
+  const first = normalizeIncident(raw);
+  assert.equal(first.level, 'info');
+  assert.equal(first.status_code, 200);
+  assert.equal(first.method, 'GET');
+  assert.equal(first.duration_ms, 2.14);
+  assert.equal(first.error_type, null);
+  assert.equal(first.fingerprint, null);
+  assert.equal(first.event_id, normalizeIncident(raw).event_id, 'event identity survives history reload');
+});

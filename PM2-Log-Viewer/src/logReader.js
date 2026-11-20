@@ -248,16 +248,15 @@ class PM2LogReader extends EventEmitter {
       return;
     }
 
-    // Process only entries where level is "error"
-    if (!parsed || parsed.level !== 'error') {
+    // Ignore unstructured PM2 startup chatter, but retain every structured level.
+    if (!parsed || !['info', 'warn', 'error', 'debug'].includes(parsed.level)) {
       return;
     }
 
     const incident = normalizeIncident(parsed);
 
     // Track fingerprint
-    const isFirstTimeSeen = !this.processedFingerprints.has(incident.fingerprint);
-    this.processedFingerprints.add(incident.fingerprint);
+    if (incident.fingerprint) this.processedFingerprints.add(incident.fingerprint);
 
     // Initial delivery status
     let initialStatus = 'received';
@@ -267,6 +266,7 @@ class PM2LogReader extends EventEmitter {
         ? 'forwarded'
         : 'received';
     }
+    if (incident.level !== 'error') initialStatus = 'not-required';
 
     const entry = {
       ...incident,
